@@ -14,8 +14,8 @@ package {
 		private static var $ins:Main;
 
 		// Version
-		private const $version:int 				= 4;
-		private const $versionService:int 		= 2;
+		private const $version:int 				= 5;
+		private const $versionService:int 		= 0;
 		private const $betaVersion:Boolean 		= false;
 		private const bugs:Boolean 				= false;
 

@@ -38,6 +38,7 @@ package  {
 
 		private const COLOR_BAD:String = "#CC171C"; // Red
 		private const COLOR_SUCCESS:String = "#189510"; // Green
+		private const COLOR_WARN:String = "#CB5815"; // Orange
 
 		private var xlFilePathError:Boolean = false;
 		private var xmlFilePathError:Boolean = false;
@@ -338,6 +339,7 @@ package  {
 		private var groups:XMLList;
 		private var currentGroup:XML;
 		private var emptyLinesCount:int;
+		private var wholeLineIsEmpty:Boolean;
 
 		private var srvsObj:Object = {};
 
@@ -402,7 +404,7 @@ package  {
 			// EXCEL
 			xlSheet = xlLoader.worksheet("Sheet1");
 
-			if (xlSheet.getCellValue("A1").search(/parcel number/i) == -1) {
+			if (xlSheet.getCellValue("A1").search(/Parcel List/i) == -1) {
 				outputLogLine("Неверный формат Excel", COLOR_BAD);
 				return;
 			}
@@ -415,19 +417,21 @@ package  {
 			 */
 			tracksCount = existingGroupsCount = existingTracksCount = 0;
 
-			row = 2;
+			row = 3;
 			groupMode = false;
 			emptyLinesCount = 0;
+			wholeLineIsEmpty = false;
 
 			groups = new XMLList(<track-script-output></track-script-output>);
 
 			var groupColVal:String;
-			var nameColVal:String;
 			var trackColVal:String;
-			var cntColVal:String;
+			var adrColVal:String;
+			//var nameColVal:String;
+			//var cntColVal:String;
 
 			var trackCol:String;
-			var trackColumns:Array = ["B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q"];
+			var trackColumns:Array = ["J"];
 
 			var groupName:String;
 			var name:String;
@@ -457,10 +461,34 @@ package  {
 
 			while (active) {
 
-				groupColVal = xlSheet.getCellValue("A" + row);
-				nameColVal = xlSheet.getCellValue("E" + row);
-				cntColVal = xlSheet.getCellValue("J" + row);
+				// Reset some variables
+				wholeLineIsEmpty = false;
+
+				groupColVal = xlSheet.getCellValue("C" + row);
 				trackColVal = xlSheet.getCellValue(trackCol + row);
+				adrColVal = xlSheet.getCellValue("H" + row);
+				//nameColVal = xlSheet.getCellValue("E" + row);
+				//cntColVal = xlSheet.getCellValue("J" + row);
+
+				if (groupColVal == "" && trackColVal == "" && adrColVal == "") {
+					wholeLineIsEmpty = true;
+				}
+
+				if (adrColVal == "" || adrColVal == null) {
+
+					!wholeLineIsEmpty && outputLogLine("Пустой адрес на строке " + row, COLOR_WARN);
+
+				} else {
+
+					var adrObj:Object = parseAddressCell(adrColVal);
+					name = adrObj.name;
+					country = adrObj.country;
+
+				}
+
+				if (trackColVal == "") {
+					!wholeLineIsEmpty && outputLogLine("Пустой трек на строке " + row, COLOR_WARN);
+				}
 
 				if (trackColVal != "" && emptyLinesCount == 1) {
 					emptyLinesCount = 0;
@@ -491,8 +519,8 @@ package  {
 				}
 
 				track = trimSpaces(trackColVal);
-				name = trimSpaces(nameColVal);
-				country = trimSpaces(cntColVal);
+				//name = trimSpaces(nameColVal);
+				//country = trimSpaces(cntColVal);
 
 				var xmlTrack:XML = new XML(<track></track>);
 				var xmlTrackServs:XML = new XML(<servs></servs>);
@@ -643,6 +671,63 @@ package  {
 				e.bytesLoaded + " / " + e.bytesTotal,
 				Math.floor(e.bytesLoaded / e.bytesTotal * 100) + "%"
 			);
+		}
+
+		private function parseAddressCell(adrCellVal:String):Object {
+
+			var ctrlCharPattern:RegExp = /(\r|\n|\r\n)/;
+			var name:String;
+			var country:String;
+
+			var adrColVal:String = trimSpaces(adrCellVal);
+
+			// Check: empty or one line
+			if (adrColVal.length < 1 || adrColVal.search(ctrlCharPattern) == -1) {
+				// return
+			}
+
+			var adrLines:Array;
+			var linesTemp:Array = [];
+
+			// Разделить по строкам
+			adrLines = adrColVal.split(ctrlCharPattern);
+
+			var i:int;
+
+			// Отчистить от управляющих символов
+			for (i = 0; i < adrLines.length; i++) {
+				if ((adrLines[i] as String).search(ctrlCharPattern) == -1) {
+					linesTemp.push(adrLines[i]);
+				}
+			}
+
+			adrLines = linesTemp;
+			linesTemp = [];
+
+			// Отчистить от пустых символов
+			for (i = 0; i < adrLines.length; i++) {
+				if ((adrLines[i] as String).length != 0 || (adrLines[i] as String) != "") {
+					linesTemp.push(adrLines[i]);
+				}
+			}
+
+			adrLines = linesTemp;
+			linesTemp = null;
+
+			// PARSE
+			var reArr:Array;
+
+			// Name
+			reArr = (adrLines[0] as String).match(/^Name: (.+)/);
+			if (reArr != null) {
+				name = trimSpaces(reArr[1] as String);
+			}
+
+			// Country
+			country = trimSpaces(adrLines[adrLines.length-1] as String);
+
+			return { name: name, country: country };
+
 		}
 
 		private function getCntServices(cnt:String):Array {
