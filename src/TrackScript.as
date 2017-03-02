@@ -339,6 +339,7 @@ package  {
 		private var groups:XMLList;
 		private var currentGroup:XML;
 		private var emptyLinesCount:int;
+		private var wholeLineIsEmpty:Boolean;
 
 		private var srvsObj:Object = {};
 
@@ -419,6 +420,7 @@ package  {
 			row = 3;
 			groupMode = false;
 			emptyLinesCount = 0;
+			wholeLineIsEmpty = false;
 
 			groups = new XMLList(<track-script-output></track-script-output>);
 
@@ -459,15 +461,22 @@ package  {
 
 			while (active) {
 
+				// Reset some variables
+				wholeLineIsEmpty = false;
+
 				groupColVal = xlSheet.getCellValue("C" + row);
 				trackColVal = xlSheet.getCellValue(trackCol + row);
 				adrColVal = xlSheet.getCellValue("H" + row);
 				//nameColVal = xlSheet.getCellValue("E" + row);
 				//cntColVal = xlSheet.getCellValue("J" + row);
 
+				if (groupColVal == "" && trackColVal == "" && adrColVal == "") {
+					wholeLineIsEmpty = true;
+				}
+
 				if (adrColVal == "" || adrColVal == null) {
 
-					//outputLogLine("Адрес пуст на строке " + row, COLOR_WARN);
+					!wholeLineIsEmpty && outputLogLine("Пустой адрес на строке " + row, COLOR_WARN);
 
 				} else {
 
@@ -475,6 +484,10 @@ package  {
 					name = adrObj.name;
 					country = adrObj.country;
 
+				}
+
+				if (trackColVal == "") {
+					!wholeLineIsEmpty && outputLogLine("Пустой трек на строке " + row, COLOR_WARN);
 				}
 
 				if (trackColVal != "" && emptyLinesCount == 1) {
