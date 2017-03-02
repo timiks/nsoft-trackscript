@@ -1,0 +1,8 @@
+bin/
+bundle/
+releases/
+patches/
+
+obj/
+
+*.air
