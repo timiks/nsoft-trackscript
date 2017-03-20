@@ -538,7 +538,7 @@ package  {
 				var servAlias:String;
 
 				for each (servAlias in servAliases) {
-					xmlServ = new XML(<serv></serv>);
+					xmlServ = new XML(<serv/>);
 					xmlServ.@id = ++maxID;
 					xmlServ.@crdt = currentDate;
 					xmlServ.@serv = servAlias;
@@ -551,7 +551,7 @@ package  {
 				if (specialServs != null) {
 
 					for each (servAlias in specialServs) {
-						xmlServ = new XML(<serv></serv>);
+						xmlServ = new XML(<serv/>);
 						xmlServ.@id = ++maxID;
 						xmlServ.@crdt = currentDate;
 						xmlServ.@serv = servAlias;
@@ -561,7 +561,15 @@ package  {
 
 				}
 
+				// Special event "Added". Appended to every track
+				var xmlEventAdded:XML = new XML(<event/>);
+				xmlEventAdded.@id = ++maxID;
+				xmlEventAdded.@crdt = currentDate;
+				xmlEventAdded.@desc = "Added";
+				xmlEventAdded.@udt = printDate(true);
+
 				xmlTrack.appendChild(xmlTrackServs);
+				xmlTrack.appendChild(xmlEventAdded);
 				currentGroup.appendChild(xmlTrack);
 				tracksCount++;
 
@@ -923,10 +931,17 @@ package  {
 
 		}
 
-		private function printDate():String {
+		private function printDate(noTime:Boolean = false):String {
 			var d:Date = new Date();
 			var dtf:DateTimeFormatter = new DateTimeFormatter("ru-RU");
 			var dstr:String;
+
+			if (noTime) {
+				dtf.setDateTimePattern("yyyy-MM-dd"); // 2017-03-20
+				dstr = dtf.format(d);
+				return dstr;
+			}
+
 			dtf.setDateTimePattern("yyyy-MM-dd @ HH:mm:ss"); // 2016-01-28T07:35:23
 			dstr = dtf.format(d);
 			dstr = dstr.replace(/\s@\s/, "T");
