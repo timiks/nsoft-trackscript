@@ -876,7 +876,7 @@ package  {
 			}
 
 			var srvs:Object = {};
-			var tmpArr:Array = [];
+			var tmpArr:Array = []; // [!] Not in use
 			var reArr:Array = [];
 			var re1:RegExp = /^(.+) \[(.+)\]/;
 			var re2:RegExp = /, ?/;
@@ -949,7 +949,7 @@ package  {
 		}
 
 		private function trimSpaces(str:String):String {
-			var ret:String = str.replace(/^\s*(.*)\s*$/, "$1");
+			var ret:String = str.replace(/^\s*(.*?)\s*$/, "$1");
 			return ret;
 		}
 

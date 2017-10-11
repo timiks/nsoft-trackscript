@@ -2,7 +2,7 @@ import sys
 import subprocess as sp
 
 ADLcmd = [
-	r"C:\Installed Soft\FD\Tools\flexsdk\bin\adl.exe", 
+	r"C:\Installed Soft\FD\Tools\sdk\bin\adl.exe", 
 	"application.xml", 
 	"bin"
 ]
