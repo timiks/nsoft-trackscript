@@ -22,6 +22,7 @@ package
 	import flash.globalization.DateTimeFormatter;
 	import flash.net.FileFilter;
 	import flash.system.Capabilities;
+	import flash.text.TextField;
 	import flash.text.TextFormat;
 	import flash.ui.Keyboard;
 	import flash.utils.ByteArray;
@@ -196,6 +197,15 @@ package
 					ui.tfXlFile.htmlText = colorText(COLOR_BAD, ui.tfXlFile.text);
 					xlFilePathError = true;
 				}
+				
+				if (!validateFileInput(ui.tfXlFile, xlFile, /.xlsx$/))
+				{
+					xlFilePathError = true;
+				}
+				else
+				{
+					xlFilePathError = false;
+				}
 			}
 			
 			else if (tf == ui.tfXmlFile)
@@ -214,9 +224,16 @@ package
 					ui.tfXmlFile.htmlText = colorText(COLOR_BAD, ui.tfXmlFile.text);
 					xmlFilePathError = true;
 				}
+				
+				if (!validateFileInput(ui.tfXmlFile, xmlFile, /.xml$/))
+				{
+					xmlFilePathError = true;
+				}
+				else
+				{
+					xmlFilePathError = false;
+				}
 			}
-			
-			validateInputs();
 		}
 		
 		private function onFileSelect(e:Event):void
@@ -251,64 +268,38 @@ package
 			}
 		}
 		
-		private function validateInputs():Boolean
+		private function validateFileInput(inputTF:TextField, file:File, fileExtensionTpl:RegExp):Boolean
 		{
-			// Empty paths
-			if (ui.tfXlFile.text == "" || ui.tfXmlFile.text == "")
-			{
+			// General checks
+			if (!(inputTF is TextField))
+				throw new Error("Specified object is not a TextField");
+			
+			// Empty path
+			if (inputTF.text == "")
 				return false;
-			}
 			
 			// Not that extension
-			if (ui.tfXlFile.text.search(/.xlsx$/) == -1)
+			if (inputTF.text.search(fileExtensionTpl) == -1)
 			{
-				ui.tfXlFile.htmlText = colorText(COLOR_BAD, ui.tfXlFile.text);
+				inputTF.htmlText = colorText(COLOR_BAD, inputTF.text);
 				return false;
 			}
 			else
 			{
-				ui.tfXlFile.htmlText = colorText("#000000", ui.tfXlFile.text);
-			}
-			
-			if (ui.tfXmlFile.text.search(/.xml$/) == -1)
-			{
-				ui.tfXmlFile.htmlText = colorText(COLOR_BAD, ui.tfXmlFile.text);
-				return false;
-			}
-			else
-			{
-				ui.tfXmlFile.htmlText = colorText("#000000", ui.tfXmlFile.text);
+				inputTF.htmlText = colorText("#000000", inputTF.text);
 			}
 			
 			// Not existing
 			try
 			{
-				if (!xlFile.exists)
+				if (!file.exists)
 				{
-					ui.tfXlFile.htmlText = colorText(COLOR_BAD, ui.tfXlFile.text);
+					inputTF.htmlText = colorText(COLOR_BAD, inputTF.text);
 					return false;
 				}
 				else
 				{
-					ui.tfXlFile.htmlText = colorText("#000000", ui.tfXlFile.text);
-				}
-			}
-			
-			catch (e:Error)
-			{
-				trace("АШИБКА");
-			}
-			
-			try
-			{
-				if (!xmlFile.exists)
-				{
-					ui.tfXmlFile.htmlText = colorText(COLOR_BAD, ui.tfXmlFile.text);
-					return false;
-				}
-				else
-				{
-					ui.tfXmlFile.htmlText = colorText("#000000", ui.tfXmlFile.text);
+					inputTF.htmlText = colorText("#000000", inputTF.text);
 				}
 			}
 			
@@ -320,26 +311,10 @@ package
 			return true;
 		}
 		
-		private function generalValidate():Boolean
-		{
-			var status:Boolean;
-			
-			if (xlFilePathError || xmlFilePathError)
-			{
-				return false;
-			}
-			
-			status = validateInputs();
-			
-			return status;
-		}
-		
 		private function outputLogLine(tx:String, color:String = null):void
 		{
 			if (tx == "=")
-			{
 				tx = "=============================";
-			}
 			
 			ui.taOutput.htmlText += (color != null ? colorText(color, tx) : tx) + "\n";
 			ui.taOutput.verticalScrollPosition = ui.taOutput.maxVerticalScrollPosition;
@@ -373,40 +348,35 @@ package
 		
 		private function start():void
 		{
-			if (!generalValidate())
+			if (xmlFilePathError)
 			{
-				outputLogLine("Имеются ошибки. Запуск невозможен.", COLOR_BAD);
+				outputLogLine("Ошибка в пути к файлу data.xml. Запуск невозможен.", COLOR_BAD);
 				return;
 			}
 			
 			ui.taOutput.text = "";
-			
-			// Load excel file
-			xlLoader = new XLSXLoader();
-			xlLoader.addEventListener(Event.COMPLETE, start2);
-			xlLoader.load(ui.tfXlFile.text);
-			outputLogLine("Загрузка файла Excel");
-		}
-		
-		private function start2(e:Event):void
-		{
-			xlLoader.removeEventListener(Event.COMPLETE, start2);
 			
 			// XML File Reading Start
 			xmlFile.nativePath = ui.tfXmlFile.text;
 			fst = new FileStream();
 			
 			fst.addEventListener(ProgressEvent.PROGRESS, onXMLFileLoadingProgress);
-			fst.addEventListener(Event.COMPLETE, start3);
+			fst.addEventListener(Event.COMPLETE, onXMLFileLoadingDone);
 			fst.openAsync(xmlFile, FileMode.READ);
 			outputLogLine("Загрузка файла \"data.xml\"");
 		}
 		
-		private function start3(e:Event):void
+		private function onXMLFileLoadingProgress(e:ProgressEvent):void
 		{
-			// XML
+			trace("Loading XML File. Progress:",
+				e.bytesLoaded + " / " + e.bytesTotal, Math.floor(e.bytesLoaded / e.bytesTotal * 100) + "%");
+		}
+		
+		private function onXMLFileLoadingDone(e:Event):void 
+		{
+			// Preparing data.xml
 			trace("XML Data File: reading done");
-			fst.removeEventListener(Event.COMPLETE, start3);
+			fst.removeEventListener(Event.COMPLETE, onXMLFileLoadingDone);
 			trace("Bytes Available " + fst.bytesAvailable);
 			xmlString = fst.readUTFBytes(fst.bytesAvailable)
 			fst.close();
@@ -429,7 +399,22 @@ package
 			
 			outputLogLine("MaxID: " + String(maxID) + "; " + "Элементов в корневой группе: " + String(rootNodesCount));
 			
-			// EXCEL
+			// Mode fork
+			//...
+		}
+		
+		private function startLoadingCantonExcelFile():void
+		{
+			// Load excel file (Canton warehouse format)
+			xlLoader = new XLSXLoader();
+			xlLoader.addEventListener(Event.COMPLETE, processCantonExcelMode);
+			xlLoader.load(ui.tfXlFile.text);
+			outputLogLine("Загрузка файла Excel");
+		}
+		
+		private function processCantonExcelMode(e:Event):void
+		{
+			xlLoader.removeEventListener(Event.COMPLETE, processCantonExcelMode);
 			xlSheet = xlLoader.worksheet("Sheet1");
 			
 			if (xlSheet.getCellValue("A1").search(/Parcel List/i) == -1)
@@ -438,10 +423,8 @@ package
 				return;
 			}
 			
-			//outputLogLine("=");
-			
 			/**
-			 * Parsing Excel
+			 * Parsing Canton Excel Format
 			 * ================================================================================
 			 */
 			tracksCount = existingGroupsCount = existingTracksCount = 0;
@@ -613,22 +596,11 @@ package
 			}
 			
 			// Write result of script work to output.xml
-			var d:Date = new Date();
-			var dtf:DateTimeFormatter = new DateTimeFormatter("ru-RU");
-			var dstr:String;
-			dtf.setDateTimePattern("dd.MM.yyyy HH:mm:ss");
-			dstr = dtf.format(d);
-			
-			groups.@date = dstr;
+			groups.@date = getFormattedDate("dd.MM.yyyy HH:mm:ss");
 			groups.@version = main.version;
 			groups.@excel = ui.tfXlFile.text;
 			
-			XML.prettyPrinting = true;
-			XML.prettyIndent = 4;
-			var outputFile:File = File.applicationStorageDirectory.resolvePath("output.xml");
-			fst.openAsync(outputFile, FileMode.WRITE);
-			fst.writeUTFBytes(groups.toXMLString());
-			fst.close();
+			writeToOutputFile(groups);
 			
 			/**
 			 * Filling source XML (dataXml) with generated groups
@@ -705,20 +677,157 @@ package
 			 * Write Back to XML File
 			 * ================================================================================
 			 */
+			writeBackToXMLFile();
+			
+			outputLogLine("Готово", COLOR_SUCCESS);
+		}
+		
+		private function processProviderDirectMode():void 
+		{
+			/*
+			Главный алгоритм
+			> Parse text with information from clipboard
+			> Prepare XML-tree based on parsed records to be inserted in main XML
+			> Write script's result to output.xml
+			> Add script's result to in-memory data.xml
+			> Show some stats
+			> Write back in-memory data to data.xml file
+			*/
+			
+			/*
+			[Code task here]:
+			> Check whether format inside clipboard is right
+			>	* if not > show error in output; abort entire processing
+			*/
+			
+			/**
+			 * Parse Provider Text (Frontwinner)
+			 * ================================================================================
+			 */
+			var tx:String; // [!] Must be taken from clipboard
+			var txAr:Vector.<String> = new Vector.<String>();
+			var reAr:Array = []; // Temp array for RegEx operations
+			var currentRecord:Object;
+			var tmpRecordSourceLines:Vector.<String>;
+			var recordsCount:int = 0;
+			var allRecords:Vector.<Object>;
+			
+			var active:Boolean = false;
+			var idx:int = 0; // Current index in text array
+			var l:String; // Current processed line in cycle
+			var linesInRecord:int = 0;
+			
+			var recordHeaderMark:RegExp = /Shipped$/i;
+			var dateInHeaderTpl:RegExp = /^([\d-]+)(?= ?#)/;
+			
+			// [To-Do Here ↓]: Split text into array of lines
+			
+			// Start parsing
+			active = true;
+			allRecords = new Vector.<Object>();
+			
+			while (active)
+			{
+				if (idx == txAr.length)
+				{
+					// Finish final record
+					if (tmpRecordSourceLines.length != 0) 
+						finishRecord();
+					
+					// End of the parsing
+					active = false;
+					break;
+				}
+				
+				l = txAr[idx] as String;
+				idx++;
+				
+				// New record 'Shipped' mark occurrence (Header line)
+				// Header
+				if (l.search(recordHeaderMark) != -1) 
+				{
+					// First occurrence
+					if (recordsCount == 0) 
+					{
+						initNewRecord();
+					}
+					// Occurrence when filling previous record
+					else
+					{
+						finishRecord();
+						initNewRecord();
+					}
+				}
+				
+				// Not Header (ordinary line)
+				else
+				{
+					// Check whether script is aware of filling record
+					if (recordsCount > 0)
+					{
+						// Add the line to temp array of record lines
+						// and continue to next
+						tmpRecordSourceLines.push(l);
+						continue;
+					}
+					else
+					{
+						// Pass the line
+						// Invalid format (Header line should be first in text)
+						continue;
+					}
+				}
+			}
+			
+			function initNewRecord():void 
+			{
+				currentRecord = {};
+				tmpRecordSourceLines = new Vector.<String>();
+				
+				// Retrieve date
+				reAr = l.match(dateInHeaderTpl); // From Header line (it's currently being processed)
+				currentRecord.date = reAr[0]; // [!] Pay attention
+				
+				recordsCount++;
+			}
+			
+			function finishRecord():void 
+			{
+				linesInRecord = tmpRecordSourceLines.length;
+				if (linesInRecord < 2) 
+				{
+					outputLogLine("Invalid record " + recordsCount, COLOR_WARN);
+					currentRecord.invalid = true;
+					continue; // [!] Pay attention: should call next iteration on cycle where this function is called
+					return;
+				}
+				
+				currentRecord.track = trimSpaces(tmpRecordSourceLines[1]);
+				currentRecord.name = trimSpaces(tmpRecordSourceLines[2]);
+				currentRecord.country = trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-1]); // Last line
+				allRecords.push(currentRecord);
+			}
+			
+			/**
+			 * Form tracks in XML
+			 * ================================================================================
+			 */
+			/*
+			Алгоритм
+			> Check 'Frontwinner' group existence in data.xml
+			> 	* if found > add all tracks there
+			>	* if not found > create such group; add all tracks there
+			*/
+		}
+		
+		private function writeBackToXMLFile():void 
+		{
 			XML.prettyPrinting = false;
 			var outputStr:String = dataXml.toXMLString();
 			
 			fst.openAsync(xmlFile, FileMode.WRITE);
 			fst.writeUTFBytes(outputStr);
 			fst.close();
-			
-			outputLogLine("Готово", COLOR_SUCCESS);
-		}
-		
-		private function onXMLFileLoadingProgress(e:ProgressEvent):void
-		{
-			trace("Loading XML File. Progress:",
-				e.bytesLoaded + " / " + e.bytesTotal, Math.floor(e.bytesLoaded / e.bytesTotal * 100) + "%");
 		}
 		
 		private function parseAddressCell(adrCellVal:String):Object
@@ -886,6 +995,14 @@ package
 			return ret;
 		}
 		
+		private function getFormattedDate(formatStr:String):String 
+		{
+			var d:Date = new Date();
+			var dtf:DateTimeFormatter = new DateTimeFormatter("ru-RU");
+			dtf.setDateTimePattern(formatStr);
+			return dtf.format(d);
+		}
+		
 		/**
 		 * Paints an HTML-text to hex-color (Format: #000000) and returns HTML-formatted string
 		 * @param color Hex-color of paint (Format: #000000)
@@ -895,6 +1012,16 @@ package
 		private function colorText(color:String, tx:String):String
 		{
 			return "<font color=\"" + color + "\">" + tx + "</font>";
+		}
+		
+		private function writeToOutputFile(xml:XMLList):void 
+		{
+			XML.prettyPrinting = true;
+			XML.prettyIndent = 4;
+			var outputFile:File = File.applicationStorageDirectory.resolvePath("output.xml");
+			fst.openAsync(outputFile, FileMode.WRITE);
+			fst.writeUTFBytes(xml.toXMLString());
+			fst.close();
 		}
 		
 		private const srvsFileDefaultContent:String = "# ФОРМАТ:\r\n# Country [serv]\r\n# Country [serv1, serv2, ...]\r\n\r\nUnited States [usps]\r\nCanada [ca]\r\nUnited Kingdom [gb_post, gb_post_det]\r\nGermany [dhl_ger_en]\r\nSpain [esp]\r\nItaly [it_post]\r\nAustralia [aus]\r\nSlovakia [sk_post_en]\r\nSlovenia [si]\r\nBrazil [bra_en]\r\nSwitzerland [swi]\r\nChile [cl_correos]\r\nCzech Republic [cz_post_en]\r\nDenmark [dk]\r\nFinland [fi]\r\nFrance [fr_lap]\r\nCroatia [hr, hr_post]\r\nHungary [hu]\r\nIreland [ie, ie_post]\r\nJapan [jap]\r\nKorea [kor]\r\nLatvia [lv_en]\r\nMexico [mx, mx_dhl]\r\nNetherlands [nl_post, nl_dhl]\r\nNorway [no]\r\nNew Zealand [nz]\r\nPeru [pe_post]\r\nPoland [pl, pl_dhl]\r\nPortugal [pt_post]\r\nSweden [se_dhl, se_post]\r\nSingapore [sg_post]\r\nThailand [thai]\r\nIsrael [isl]";
