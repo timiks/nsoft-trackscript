@@ -350,7 +350,7 @@ package
 		{
 			if (xmlFilePathError)
 			{
-				outputLogLine("Ошибка в пути к файлу data.xml. Запуск невозможен.", COLOR_BAD);
+				outputLogLine("Ошибка в пути к файлу 'data.xml'. Запуск невозможен.", COLOR_BAD);
 				return;
 			}
 			
@@ -399,8 +399,9 @@ package
 			
 			outputLogLine("MaxID: " + String(maxID) + "; " + "Элементов в корневой группе: " + String(rootNodesCount));
 			
-			// Mode fork
-			//...
+			// [~ Coding task here #CDT ~]: Fork — processing modes
+			// Calling the right function based on current state of mode
+			currentDate = printDate();
 		}
 		
 		private function startLoadingCantonExcelFile():void
@@ -471,7 +472,6 @@ package
 			
 			outputLogLine("Колонка с треками: " + trackCol);
 			
-			currentDate = printDate();
 			active = true;
 			
 			while (active)
@@ -530,11 +530,7 @@ package
 					groupMode = true;
 					groupName = trimSpaces(groupColVal);
 					
-					currentGroup = <groups></groups>;
-					currentGroup.@id = ++maxID;
-					currentGroup.@desc = groupName;
-					currentGroup.@crdt = currentDate;
-					
+					currentGroup = createXmlGroup(groupName);
 					groups.appendChild(currentGroup);
 				}
 				
@@ -542,55 +538,7 @@ package
 				//name = trimSpaces(nameColVal);
 				//country = trimSpaces(cntColVal);
 				
-				var xmlTrack:XML = new XML(<track></track>);
-				var xmlTrackServs:XML = new XML(<servs></servs>);
-				var xmlServ:XML;
-				
-				xmlTrack.@id = ++maxID;
-				xmlTrack.@desc = name;
-				xmlTrack.@crdt = currentDate;
-				xmlTrack.@track = track;
-				
-				xmlTrackServs.@id = ++maxID;
-				xmlTrackServs.@crdt = currentDate;
-				
-				var servAliases:Array = ["china", "china_alt", "china_ems"];
-				var servAlias:String;
-				
-				for each (servAlias in servAliases)
-				{
-					xmlServ = new XML(<serv/>);
-					xmlServ.@id = ++maxID;
-					xmlServ.@crdt = currentDate;
-					xmlServ.@serv = servAlias;
-					xmlServ.@selected = 1;
-					xmlTrackServs.appendChild(xmlServ);
-				}
-				
-				var specialServs:Array = getCntServices(country);
-				
-				if (specialServs != null)
-				{
-					for each (servAlias in specialServs)
-					{
-						xmlServ = new XML(<serv/>);
-						xmlServ.@id = ++maxID;
-						xmlServ.@crdt = currentDate;
-						xmlServ.@serv = servAlias;
-						xmlServ.@selected = 1;
-						xmlTrackServs.appendChild(xmlServ);
-					}
-				}
-				
-				// Special event "Added". Appended to every track
-				var xmlEventAdded:XML = new XML(<event/>);
-				xmlEventAdded.@id = ++maxID;
-				xmlEventAdded.@crdt = currentDate;
-				xmlEventAdded.@desc = "Added";
-				xmlEventAdded.@udt = printDate(true);
-				
-				xmlTrack.appendChild(xmlTrackServs);
-				xmlTrack.appendChild(xmlEventAdded);
+				var xmlTrack:XML = createXmlTrack(name, track, country);
 				currentGroup.appendChild(xmlTrack);
 				tracksCount++;
 			}
@@ -688,23 +636,27 @@ package
 			Главный алгоритм
 			> Parse text with information from clipboard
 			> Prepare XML-tree based on parsed records to be inserted in main XML
-			> Write script's result to output.xml
 			> Add script's result to in-memory data.xml
+			> Write script's result to output.xml
 			> Show some stats
 			> Write back in-memory data to data.xml file
 			*/
 			
+			var tx:String; // From system clipboard
 			/*
-			[Code task here]:
+			[~ Coding task here #CDT ~]
+			> Get text from clipoadrd
 			> Check whether format inside clipboard is right
 			>	* if not > show error in output; abort entire processing
+			> Reset stat variables
 			*/
+			
+			tracksCount = existingTracksCount = 0;
 			
 			/**
 			 * Parse Provider Text (Frontwinner)
 			 * ================================================================================
 			 */
-			var tx:String; // [!] Must be taken from clipboard
 			var txAr:Vector.<String> = new Vector.<String>();
 			var reAr:Array = []; // Temp array for RegEx operations
 			var currentRecord:Object;
@@ -720,7 +672,7 @@ package
 			var recordHeaderMark:RegExp = /Shipped$/i;
 			var dateInHeaderTpl:RegExp = /^([\d-]+)(?= ?#)/;
 			
-			// [To-Do Here ↓]: Split text into array of lines
+			// [~ Coding task here #CDT ~]: Split text to array of lines
 			
 			// Start parsing
 			active = true;
@@ -786,19 +738,21 @@ package
 				
 				// Retrieve date
 				reAr = l.match(dateInHeaderTpl); // From Header line (it's currently being processed)
-				currentRecord.date = reAr[0]; // [!] Pay attention
+				currentRecord.date = reAr[0]; // [!] #PADBG
 				
 				recordsCount++;
 			}
 			
 			function finishRecord():void 
 			{
+				tracksCount++;
+				
 				linesInRecord = tmpRecordSourceLines.length;
 				if (linesInRecord < 2) 
 				{
 					outputLogLine("Invalid record " + recordsCount, COLOR_WARN);
-					currentRecord.invalid = true;
-					continue; // [!] Pay attention: should call next iteration on cycle where this function is called
+					currentRecord = null; // Invalid record isn't added to final list of records (allRecords)
+					continue; // [!] #PADBG#: should call next iteration on cycle where this function is called
 					return;
 				}
 				
@@ -814,10 +768,78 @@ package
 			 */
 			/*
 			Алгоритм
+			> Create XML-tree
 			> Check 'Frontwinner' group existence in data.xml
 			> 	* if found > add all tracks there
 			>	* if not found > create such group; add all tracks there
 			*/
+			
+			var newFrontwinnerGrp:XMLList = createXmlGroup("Frontwinner", printDate());
+			var rec:Object
+			for each (rec in allRecords) 
+			{
+				newFrontwinnerGrp.appendChild(createXmlTrack(rec.name, rec.track, rec.country, rec.date));
+			}
+			
+			var rootGroup:XMLList = dataXml.groups.(@id == 0);
+			
+			var frontwinnerGrp:* = rootGroup..groups.(@desc == "Frontwinner");
+			if (frontwinnerGrp.length() > 0)
+			{
+				for each (var t:XML in newFrontwinnerGrp)
+				{
+					// Track Existence Check
+					// If found duplicate > skip this track
+					x = frontwinnerGrp.track.(@desc == t.@desc && @track == t.@track);
+					if (x.length() > 0)
+					{
+						main.logRed("Track Duplicate Found: " + t.@desc + " " + t.@track);
+						existingTracksCount++;
+						continue;
+					}
+					
+					frontwinnerGrp.appendChild(t);
+				}
+			}
+			else
+			{
+				rootGroup.prependChild(newFrontwinnerGrp);
+			}
+			
+			/**
+			 * Write to Output File
+			 * ================================================================================
+			 */
+			var output:XMLList = <track-script-output/>;
+			output.@date = getFormattedDate("dd.MM.yyyy HH:mm:ss");
+			output.@version = main.version;
+			writeToOutputFile(output);
+			
+			/**
+			 * Show Stats
+			 * ================================================================================
+			 */
+			outputLogLine("Обработано треков: " + tracksCount);
+			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount);
+			
+			if (tracksCount == existingTracksCount && tracksCount > 0)
+			{
+				outputLogLine("Похоже кто-то прогнал меня два раза", COLOR_BAD);
+			}
+			
+			if (Capabilities.isDebugger || devFlag)
+			{
+				outputLogLine("Готово", COLOR_SUCCESS);
+				return;
+			}
+			
+			/**
+			 * Write Back to XML File
+			 * ================================================================================
+			 */
+			writeBackToXMLFile();
+			
+			outputLogLine("Готово", COLOR_SUCCESS);
 		}
 		
 		private function writeBackToXMLFile():void 
@@ -828,6 +850,70 @@ package
 			fst.openAsync(xmlFile, FileMode.WRITE);
 			fst.writeUTFBytes(outputStr);
 			fst.close();
+		}
+		
+		private function createXmlTrack(name:String, track:String, country:String, addedEventSpecialDate:String = null):XML
+		{
+			var xmlTrack:XML = new XML(<track/>);
+			var xmlTrackServs:XML = new XML(<servs/>);
+			var xmlServ:XML;
+			
+			xmlTrack.@id = ++maxID; 
+			xmlTrack.@desc = name;
+			xmlTrack.@crdt = currentDate;
+			xmlTrack.@track = track;
+			
+			xmlTrackServs.@id = ++maxID;
+			xmlTrackServs.@crdt = currentDate;
+			
+			var servAliases:Array = ["china", "china_alt", "china_ems"];
+			var servAlias:String;
+			
+			for each (servAlias in servAliases)
+			{
+				xmlServ = new XML(<serv/>);
+				xmlServ.@id = ++maxID;
+				xmlServ.@crdt = currentDate;
+				xmlServ.@serv = servAlias;
+				xmlServ.@selected = 1;
+				xmlTrackServs.appendChild(xmlServ);
+			}
+			
+			var specialServs:Array = getCntServices(country);
+			
+			if (specialServs != null)
+			{
+				for each (servAlias in specialServs)
+				{
+					xmlServ = new XML(<serv/>);
+					xmlServ.@id = ++maxID;
+					xmlServ.@crdt = currentDate;
+					xmlServ.@serv = servAlias;
+					xmlServ.@selected = 1;
+					xmlTrackServs.appendChild(xmlServ);
+				}
+			}
+			
+			// Special event "Added". Appended to every track
+			var xmlEventAdded:XML = new XML(<event/>);
+			xmlEventAdded.@id = ++maxID;
+			xmlEventAdded.@crdt = addedEventSpecialDate == null ? currentDate : addedEventSpecialDate + "T00:00:00";
+			xmlEventAdded.@desc = "Added";
+			xmlEventAdded.@udt = addedEventSpecialDate == null ? printDate(true) : addedEventSpecialDate;
+			
+			xmlTrack.appendChild(xmlTrackServs);
+			xmlTrack.appendChild(xmlEventAdded);
+			
+			return xmlTrack;
+		}
+		
+		private function createXmlGroup(grpName:String):XML 
+		{
+			var g:XML = <groups/>;
+			g.@id = ++maxID;
+			g.@desc = grpName;
+			g.@crdt = currentDate;
+			return g;
 		}
 		
 		private function parseAddressCell(adrCellVal:String):Object
