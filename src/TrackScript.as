@@ -4,6 +4,8 @@ package
 	import com.childoftv.xlsxreader.XLSXLoader;
 	import fl.controls.Button;
 	import fl.controls.TextInput;
+	import flash.desktop.Clipboard;
+	import flash.desktop.ClipboardFormats;
 	import flash.display.NativeWindow;
 	import flash.display.Sprite;
 	import flash.display.StageAlign;
@@ -643,12 +645,12 @@ package
 			*/
 			
 			var tx:String; // From system clipboard
-			/*
-			[~ Coding task here #CDT ~]
-			> Get text from clipoadrd
-			> Check whether format inside clipboard is right
-			>	* if not > show error in output; abort entire processing
-			*/
+						
+			if (!Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
+				outputLogLine("В буфере обмена отсутсвует текст", COLOR_BAD);
+				return;
+				
+			tx = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
 			
 			/**
 			 * Split Text to Array of Lines
@@ -797,6 +799,13 @@ package
 				currentRecord.name = trimSpaces(tmpRecordSourceLines[2]);
 				currentRecord.country = trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-1]); // Last line
 				allRecords.push(currentRecord);
+			}
+			
+			// Check
+			if (allRecords.length == 0) 
+			{
+				outputLogLine("Неверный формат текста", COLOR_BAD);
+				return;
 			}
 			
 			/**
