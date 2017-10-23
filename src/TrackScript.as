@@ -648,16 +648,52 @@ package
 			> Get text from clipoadrd
 			> Check whether format inside clipboard is right
 			>	* if not > show error in output; abort entire processing
-			> Reset stat variables
 			*/
 			
-			tracksCount = existingTracksCount = 0;
+			/**
+			 * Split Text to Array of Lines
+			 * ================================================================================
+			 */
+			var ctrlCharPattern:RegExp = /(\r|\n|\r\n)/;
 			
+			// Check: empty or one line
+			if (tx.length < 1 || tx.search(ctrlCharPattern) == -1) {
+				outputLogLine("Ошибка", COLOR_BAD);
+				return;
+			}
+			
+			var txAr:Vector.<String> = new Vector.<String>();
+			var linesTemp:Array = [];
+
+			// Разделить по строкам
+			txAr = tx.split(ctrlCharPattern);
+
+			var i:int;
+
+			// Отчистить от управляющих символов
+			for (i = 0; i < txAr.length; i++) {
+				if ((txAr[i] as String).search(ctrlCharPattern) == -1) {
+					linesTemp.push(txAr[i]);
+				}
+			}
+
+			txAr = linesTemp;
+			linesTemp = [];
+
+			// Отчистить от пустых символов
+			for (i = 0; i < txAr.length; i++) {
+				if ((txAr[i] as String).length != 0 || (txAr[i] as String) != "") {
+					linesTemp.push(txAr[i]);
+				}
+			}
+
+			txAr = linesTemp;
+			linesTemp = null;
+									
 			/**
 			 * Parse Provider Text (Frontwinner)
 			 * ================================================================================
 			 */
-			var txAr:Vector.<String> = new Vector.<String>();
 			var reAr:Array = []; // Temp array for RegEx operations
 			var currentRecord:Object;
 			var tmpRecordSourceLines:Vector.<String>;
@@ -672,11 +708,12 @@ package
 			var recordHeaderMark:RegExp = /Shipped$/i;
 			var dateInHeaderTpl:RegExp = /^([\d-]+)(?= ?#)/;
 			
-			// [~ Coding task here #CDT ~]: Split text to array of lines
-			
 			// Start parsing
 			active = true;
 			allRecords = new Vector.<Object>();
+			
+			// Reset stats
+			tracksCount = existingTracksCount = 0;
 			
 			while (active)
 			{
