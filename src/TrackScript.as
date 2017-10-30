@@ -48,6 +48,7 @@ package
 		private var xlFilePathError:Boolean = false;
 		private var xmlFilePathError:Boolean = false;
 		private var devFlag:Boolean = false;
+		private var runsCount:int;
 		
 		public function TrackScript():void
 		{
@@ -148,6 +149,9 @@ package
 			// Check dev marker-file
 			if (File.applicationStorageDirectory.resolvePath("dev").exists)
 				devFlag = true;
+				
+			// Reset number of runs of the script stat
+			runsCount = 0;
 		}
 		
 		private function onUncaughtError(e:UncaughtErrorEvent):void
@@ -350,6 +354,11 @@ package
 			}
 			
 			ui.taOutput.text = "";
+			
+			// Increase number of runs stat
+			runsCount++;
+			
+			outputLogLine("Запуск #" + runsCount + " [" + getFormattedDate("HH:mm:ss") + "]");
 			
 			// XML File Reading Start
 			xmlFile.nativePath = ui.tfXmlFile.text;
