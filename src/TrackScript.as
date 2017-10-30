@@ -42,7 +42,9 @@ package
 		private const COLOR_BAD:String = "#CC171C"; // Red
 		private const COLOR_SUCCESS:String = "#189510"; // Green
 		private const COLOR_WARN:String = "#CB5815"; // Orange
+		private const COLOR_SPECIAL:String = "#0075BF"; // Blue
 		
+		private var prcMode:int;
 		private var xlFilePathError:Boolean = false;
 		private var xmlFilePathError:Boolean = false;
 		private var devFlag:Boolean = false;
@@ -153,7 +155,8 @@ package
 			if (e.error is Error)
 			{
 				var error:Error = e.error as Error;
-				outputLogLine("Ошибка: " + error.message, COLOR_BAD);
+				outputLogLine("Системная ошибка: " + error.message, COLOR_BAD);
+				outputLogLine("Требуется проинформировать об этом создателя", COLOR_BAD);
 			}
 		}
 		
@@ -200,7 +203,7 @@ package
 					xlFilePathError = true;
 				}
 				
-				if (!validateFileInput(ui.tfXlFile, xlFile, /.xlsx$/))
+				if (!validateFileInput(ui.tfXlFile.textField, xlFile, /.xlsx$/))
 				{
 					xlFilePathError = true;
 				}
@@ -227,7 +230,7 @@ package
 					xmlFilePathError = true;
 				}
 				
-				if (!validateFileInput(ui.tfXmlFile, xmlFile, /.xml$/))
+				if (!validateFileInput(ui.tfXmlFile.textField, xmlFile, /.xml$/))
 				{
 					xmlFilePathError = true;
 				}
@@ -261,21 +264,19 @@ package
 			
 			if (btn == ui.btnXlDialog)
 			{
-				xlFile.browseForOpen("Файл Excel 2007 с информацией о треках", [new FileFilter("Excel 2007", "*.xlsx")]);
+				xlFile.browseForOpen("Файл Excel 2007 с информацией о треках в формате склада Кантона",
+					[new FileFilter("Excel 2007", "*.xlsx")]);
 			}
 			
 			else if (btn == ui.btnXmlDialog)
 			{
-				xmlFile.browseForOpen("Файл \"data.xml\" от TrackChecker", [new FileFilter("Файл XML", "*.xml")]);
+				xmlFile.browseForOpen("Файл data.xml от TrackChecker",
+					[new FileFilter("Файл XML", "*.xml")]);
 			}
 		}
 		
 		private function validateFileInput(inputTF:TextField, file:File, fileExtensionTpl:RegExp):Boolean
 		{
-			// General checks
-			if (!(inputTF is TextField))
-				throw new Error("Specified object is not a TextField");
-			
 			// Empty path
 			if (inputTF.text == "")
 				return false;
@@ -338,21 +339,13 @@ package
 		private var existingGroupsCount:uint;
 		private var existingTracksCount:uint;
 		
-		private var active:Boolean;
-		private var row:int;
-		private var groupMode:Boolean;
-		private var groups:XMLList;
-		private var currentGroup:XML;
-		private var emptyLinesCount:int;
-		private var wholeLineIsEmpty:Boolean;
-		
 		private var srvsObj:Object = {};
 		
 		private function start():void
 		{
 			if (xmlFilePathError)
 			{
-				outputLogLine("Ошибка в пути к файлу 'data.xml'. Запуск невозможен.", COLOR_BAD);
+				outputLogLine("Ошибка в пути к файлу data.xml. Запуск невозможен.", COLOR_BAD);
 				return;
 			}
 			
@@ -365,7 +358,7 @@ package
 			fst.addEventListener(ProgressEvent.PROGRESS, onXMLFileLoadingProgress);
 			fst.addEventListener(Event.COMPLETE, onXMLFileLoadingDone);
 			fst.openAsync(xmlFile, FileMode.READ);
-			outputLogLine("Загрузка файла \"data.xml\"");
+			outputLogLine("Загрузка файла data.xml от TrackChecker");
 		}
 		
 		private function onXMLFileLoadingProgress(e:ProgressEvent):void
@@ -404,15 +397,40 @@ package
 			// [~ Coding task here #CDT ~]: Fork — processing modes
 			// Calling the right function based on current state of mode
 			currentDate = printDate();
+			prcMode = 1; // #TMP
+			
+			switch (prcMode) 
+			{
+				// Frontwinner provider
+				case 1:
+					processProviderDirectMode();
+					break;
+					
+				// Canton warehouse
+				case 2:
+					startLoadingCantonExcelFile();
+					break;
+					
+				default:
+					throw new Error("Out of possible modes");
+					break;
+			}
 		}
 		
 		private function startLoadingCantonExcelFile():void
 		{
+			// Excel file check
+			if (xlFilePathError)
+			{
+				outputLogLine("Ошибка в пути к файлу Excel. Запуск невозможен.", COLOR_BAD);
+				return;
+			}
+			
 			// Load excel file (Canton warehouse format)
 			xlLoader = new XLSXLoader();
 			xlLoader.addEventListener(Event.COMPLETE, processCantonExcelMode);
 			xlLoader.load(ui.tfXlFile.text);
-			outputLogLine("Загрузка файла Excel");
+			outputLogLine("Загрузка файла Excel в формате склада Кантона", COLOR_SPECIAL);
 		}
 		
 		private function processCantonExcelMode(e:Event):void
@@ -430,6 +448,15 @@ package
 			 * Parsing Canton Excel Format
 			 * ================================================================================
 			 */
+			var active:Boolean;
+			var row:int;
+			var groupMode:Boolean;
+			var groups:XML;
+			var currentGroup:XML;
+			var emptyLinesCount:int;
+			var wholeLineIsEmpty:Boolean;
+			
+			// Reset stats
 			tracksCount = existingGroupsCount = existingTracksCount = 0;
 			
 			row = 3;
@@ -437,7 +464,7 @@ package
 			emptyLinesCount = 0;
 			wholeLineIsEmpty = false;
 			
-			groups = new XMLList(<track-script-output></track-script-output>);
+			groups = <track-script-output/>;
 			
 			var groupColVal:String;
 			var trackColVal:String;
@@ -610,7 +637,7 @@ package
 			outputLogLine("Найдено групп: " + groups.children().length());
 			outputLogLine("Обработано треков: " + tracksCount);
 			if (existingGroupsCount > 0) outputLogLine("Группы, которые уже есть в программе: " + existingGroupsCount);
-			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount);
+			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
@@ -644,13 +671,14 @@ package
 			> Write back in-memory data to data.xml file
 			*/
 			
-			var tx:String; // From system clipboard
-						
 			if (!Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
-				outputLogLine("В буфере обмена отсутсвует текст", COLOR_BAD);
+			{
+				outputLogLine("В буфере обмена не найден текст", COLOR_BAD);
 				return;
-				
-			tx = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
+			}
+			
+			outputLogLine("Чтение текста в формате Frontwinner из буфера обмена", COLOR_SPECIAL);
+			var tx:String = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
 			
 			/**
 			 * Split Text to Array of Lines
@@ -660,11 +688,11 @@ package
 			
 			// Check: empty or one line
 			if (tx.length < 1 || tx.search(ctrlCharPattern) == -1) {
-				outputLogLine("Ошибка", COLOR_BAD);
+				outputLogLine("Ошибка: одна строчка в буфере обмена", COLOR_BAD);
 				return;
 			}
 			
-			var txAr:Vector.<String> = new Vector.<String>();
+			var txAr:Array = [];
 			var linesTemp:Array = [];
 
 			// Разделить по строкам
@@ -710,12 +738,22 @@ package
 			var recordHeaderMark:RegExp = /Shipped$/i;
 			var dateInHeaderTpl:RegExp = /^([\d-]+)(?= ?#)/;
 			
+			// Local stats
+			var invalidRecordsCount:int = 0;
+			
+			// Frontwinner format match check
+			if ((txAr[0] as String).search(recordHeaderMark) == -1 || txAr.length < 6)
+			{
+				outputLogLine("Ошибка: текст в буфере не походит на формат Frontwinner", COLOR_BAD);
+				return;
+			}
+			
 			// Start parsing
 			active = true;
 			allRecords = new Vector.<Object>();
 			
 			// Reset stats
-			tracksCount = existingTracksCount = 0;
+			tracksCount = existingTracksCount = invalidRecordsCount = 0;
 			
 			while (active)
 			{
@@ -777,28 +815,28 @@ package
 				
 				// Retrieve date
 				reAr = l.match(dateInHeaderTpl); // From Header line (it's currently being processed)
-				currentRecord.date = reAr[0]; // [!] #PADBG
+				currentRecord.date = reAr[0];
 				
 				recordsCount++;
 			}
 			
-			function finishRecord():void 
+			function finishRecord():int 
 			{
-				tracksCount++;
-				
 				linesInRecord = tmpRecordSourceLines.length;
-				if (linesInRecord < 2) 
+				if (linesInRecord < 5) 
 				{
-					outputLogLine("Invalid record " + recordsCount, COLOR_WARN);
+					outputLogLine("Неверный формат блока " + recordsCount, COLOR_WARN);
 					currentRecord = null; // Invalid record isn't added to final list of records (allRecords)
-					continue; // [!] #PADBG#: should call next iteration on cycle where this function is called
-					return;
+					invalidRecordsCount++;
+					return 1;
 				}
 				
 				currentRecord.track = trimSpaces(tmpRecordSourceLines[1]);
 				currentRecord.name = trimSpaces(tmpRecordSourceLines[2]);
 				currentRecord.country = trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-1]); // Last line
 				allRecords.push(currentRecord);
+				tracksCount++; // Track is considered handled only if record is valid
+				return 0;
 			}
 			
 			// Check
@@ -820,7 +858,7 @@ package
 			>	* if not found > create such group; add all tracks there
 			*/
 			
-			var newFrontwinnerGrp:XMLList = createXmlGroup("Frontwinner", printDate());
+			var newFrontwinnerGrp:XML = createXmlGroup("Frontwinner");
 			var rec:Object
 			for each (rec in allRecords) 
 			{
@@ -829,10 +867,12 @@ package
 			
 			var rootGroup:XMLList = dataXml.groups.(@id == 0);
 			
+			var x:*;
 			var frontwinnerGrp:* = rootGroup..groups.(@desc == "Frontwinner");
 			if (frontwinnerGrp.length() > 0)
 			{
-				for each (var t:XML in newFrontwinnerGrp)
+				var newTracks:XMLList = newFrontwinnerGrp.track;
+				for each (var t:XML in newTracks)
 				{
 					// Track Existence Check
 					// If found duplicate > skip this track
@@ -856,7 +896,8 @@ package
 			 * Write to Output File
 			 * ================================================================================
 			 */
-			var output:XMLList = <track-script-output/>;
+			var output:XML = <track-script-output/>;
+			output.appendChild(newFrontwinnerGrp);
 			output.@date = getFormattedDate("dd.MM.yyyy HH:mm:ss");
 			output.@version = main.version;
 			writeToOutputFile(output);
@@ -865,8 +906,9 @@ package
 			 * Show Stats
 			 * ================================================================================
 			 */
-			outputLogLine("Обработано треков: " + tracksCount);
-			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount);
+			outputLogLine("Обработано треков: " + tracksCount + ", всего найдено блоков: " + recordsCount);
+			if (invalidRecordsCount > 0) outputLogLine("Количество неверных блоков: " + invalidRecordsCount, COLOR_WARN);
+			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
@@ -890,6 +932,7 @@ package
 		
 		private function writeBackToXMLFile():void 
 		{
+			dataXml.@maxid = maxID; // Update MaxID
 			XML.prettyPrinting = false;
 			var outputStr:String = dataXml.toXMLString();
 			
@@ -898,10 +941,20 @@ package
 			fst.close();
 		}
 		
+		private function writeToOutputFile(xml:XML):void 
+		{
+			XML.prettyPrinting = true;
+			XML.prettyIndent = 4;
+			var outputFile:File = File.applicationStorageDirectory.resolvePath("output.xml");
+			fst.openAsync(outputFile, FileMode.WRITE);
+			fst.writeUTFBytes(xml.toXMLString());
+			fst.close();
+		}
+		
 		private function createXmlTrack(name:String, track:String, country:String, addedEventSpecialDate:String = null):XML
 		{
-			var xmlTrack:XML = new XML(<track/>);
-			var xmlTrackServs:XML = new XML(<servs/>);
+			var xmlTrack:XML = <track/>;
+			var xmlTrackServs:XML = <servs/>;
 			var xmlServ:XML;
 			
 			xmlTrack.@id = ++maxID; 
@@ -917,7 +970,7 @@ package
 			
 			for each (servAlias in servAliases)
 			{
-				xmlServ = new XML(<serv/>);
+				xmlServ = <serv/>;
 				xmlServ.@id = ++maxID;
 				xmlServ.@crdt = currentDate;
 				xmlServ.@serv = servAlias;
@@ -931,7 +984,7 @@ package
 			{
 				for each (servAlias in specialServs)
 				{
-					xmlServ = new XML(<serv/>);
+					xmlServ = <serv/>;
 					xmlServ.@id = ++maxID;
 					xmlServ.@crdt = currentDate;
 					xmlServ.@serv = servAlias;
@@ -941,7 +994,7 @@ package
 			}
 			
 			// Special event "Added". Appended to every track
-			var xmlEventAdded:XML = new XML(<event/>);
+			var xmlEventAdded:XML = <event/>;
 			xmlEventAdded.@id = ++maxID;
 			xmlEventAdded.@crdt = addedEventSpecialDate == null ? currentDate : addedEventSpecialDate + "T00:00:00";
 			xmlEventAdded.@desc = "Added";
@@ -953,7 +1006,7 @@ package
 			return xmlTrack;
 		}
 		
-		private function createXmlGroup(grpName:String):XML 
+		private function createXmlGroup(grpName:String):XML
 		{
 			var g:XML = <groups/>;
 			g.@id = ++maxID;
@@ -1144,16 +1197,6 @@ package
 		private function colorText(color:String, tx:String):String
 		{
 			return "<font color=\"" + color + "\">" + tx + "</font>";
-		}
-		
-		private function writeToOutputFile(xml:XMLList):void 
-		{
-			XML.prettyPrinting = true;
-			XML.prettyIndent = 4;
-			var outputFile:File = File.applicationStorageDirectory.resolvePath("output.xml");
-			fst.openAsync(outputFile, FileMode.WRITE);
-			fst.writeUTFBytes(xml.toXMLString());
-			fst.close();
 		}
 		
 		private const srvsFileDefaultContent:String = "# ФОРМАТ:\r\n# Country [serv]\r\n# Country [serv1, serv2, ...]\r\n\r\nUnited States [usps]\r\nCanada [ca]\r\nUnited Kingdom [gb_post, gb_post_det]\r\nGermany [dhl_ger_en]\r\nSpain [esp]\r\nItaly [it_post]\r\nAustralia [aus]\r\nSlovakia [sk_post_en]\r\nSlovenia [si]\r\nBrazil [bra_en]\r\nSwitzerland [swi]\r\nChile [cl_correos]\r\nCzech Republic [cz_post_en]\r\nDenmark [dk]\r\nFinland [fi]\r\nFrance [fr_lap]\r\nCroatia [hr, hr_post]\r\nHungary [hu]\r\nIreland [ie, ie_post]\r\nJapan [jap]\r\nKorea [kor]\r\nLatvia [lv_en]\r\nMexico [mx, mx_dhl]\r\nNetherlands [nl_post, nl_dhl]\r\nNorway [no]\r\nNew Zealand [nz]\r\nPeru [pe_post]\r\nPoland [pl, pl_dhl]\r\nPortugal [pt_post]\r\nSweden [se_dhl, se_post]\r\nSingapore [sg_post]\r\nThailand [thai]\r\nIsrael [isl]";
