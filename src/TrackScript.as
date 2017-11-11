@@ -39,12 +39,19 @@ package
 		private var ui:UI;
 		private var win:NativeWindow;
 		
+		private var btnFWMode:ModeButton;
+		private var btnCantonMode:ModeButton;
+		
 		private const COLOR_BAD:String = "#CC171C"; // Red
 		private const COLOR_SUCCESS:String = "#189510"; // Green
 		private const COLOR_WARN:String = "#CB5815"; // Orange
 		private const COLOR_SPECIAL:String = "#0075BF"; // Blue
 		
+		private const PRCMODE_FRONTWINNER:int = 1;
+		private const PRCMODE_CANTON_WH:int = 2;
+		
 		private var prcMode:int;
+		private var currentPrcModeButton:ModeButton;
 		private var xlFilePathError:Boolean = false;
 		private var xmlFilePathError:Boolean = false;
 		private var devFlag:Boolean = false;
@@ -120,6 +127,20 @@ package
 			ui.btnXmlDialog.addEventListener(MouseEvent.CLICK, btnDialogClick);
 			ui.btnStart.addEventListener(MouseEvent.CLICK, btnStartClick);
 			ui.btnStart.label = "З А П У С К";
+			
+			// Mode buttons
+			btnFWMode = new ModeButton(ui.btnFWMode, PRCMODE_FRONTWINNER);
+			btnFWMode.addEventListener("click", onModeButtonClick);
+			btnCantonMode = new ModeButton(ui.btnCantonMode, PRCMODE_CANTON_WH);
+			btnCantonMode.addEventListener("click", onModeButtonClick);
+			
+			function onModeButtonClick(e:Event):void 
+			{
+				switchMode((e.target as ModeButton).linkedMode);
+			}
+			
+			// Init mode
+			switchMode(main.settings.getKey(Settings.prcMode) as int);
 			
 			xlFile = new File();
 			xmlFile = new File();
@@ -327,6 +348,34 @@ package
 			ui.taOutput.verticalScrollPosition = ui.taOutput.maxVerticalScrollPosition;
 		}
 		
+		private function switchMode(modeValue:int):void 
+		{
+			var modeBtn:ModeButton;
+			
+			switch (modeValue) 
+			{
+				case PRCMODE_FRONTWINNER:
+					modeBtn = btnFWMode;
+					break;
+					
+				case PRCMODE_CANTON_WH:
+					modeBtn = btnCantonMode;
+					break;
+					
+				default:
+					throw new Error("Out of possible modes");
+					return;
+					break;
+			}
+			
+			prcMode = modeValue;
+			main.settings.setKey(Settings.prcMode, prcMode);
+			if (currentPrcModeButton != null)
+				currentPrcModeButton.active = false;
+			currentPrcModeButton = modeBtn;
+			currentPrcModeButton.active = true;
+		}
+		
 		private var fst:FileStream;
 		private var xlLoader:XLSXLoader;
 		private var xlSheet:Worksheet;
@@ -403,20 +452,19 @@ package
 			
 			outputLogLine("MaxID: " + String(maxID) + "; " + "Элементов в корневой группе: " + String(rootNodesCount));
 			
-			// [~ Coding task here #CDT ~]: Fork — processing modes
-			// Calling the right function based on current state of mode
+			// Capture current date to use it in XML output
 			currentDate = printDate();
-			prcMode = 1; // #TMP
 			
+			// Calling the right function based on current state of mode
 			switch (prcMode) 
 			{
 				// Frontwinner provider
-				case 1:
-					processProviderDirectMode();
+				case PRCMODE_FRONTWINNER:
+					processFrontwinnerMode();
 					break;
 					
 				// Canton warehouse
-				case 2:
+				case PRCMODE_CANTON_WH:
 					startLoadingCantonExcelFile();
 					break;
 					
@@ -671,7 +719,7 @@ package
 			outputLogLine("Готово", COLOR_SUCCESS);
 		}
 		
-		private function processProviderDirectMode():void 
+		private function processFrontwinnerMode():void 
 		{
 			/*
 			Главный алгоритм
