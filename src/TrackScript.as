@@ -339,8 +339,8 @@ package
 		private var maxID:uint;
 		private var currentDate:String;
 		
+		// Common stats for all modes
 		private var tracksCount:uint;
-		private var existingGroupsCount:uint;
 		private var existingTracksCount:uint;
 		
 		private var srvsObj:Object = {};
@@ -464,6 +464,9 @@ package
 			var currentGroup:XML;
 			var emptyLinesCount:int;
 			var wholeLineIsEmpty:Boolean;
+			
+			// Local stats
+			var existingGroupsCount:uint;
 			
 			// Reset stats
 			tracksCount = existingGroupsCount = existingTracksCount = 0;
@@ -734,24 +737,28 @@ package
 			 * ================================================================================
 			 */
 			var reAr:Array = []; // Temp array for RegEx operations
-			var currentRecord:Object;
+			var currentTrackRecord:Object;
 			var tmpRecordSourceLines:Vector.<String>;
-			var recordsCount:int = 0;
-			var allRecords:Vector.<Object>;
+			var allTrackRecords:Vector.<Object>;
+			
+			var totalRecordsCount:int = 0;
+			var trackRecordsCount:int = 0;
+			var notTrackRecordsCount:int = 0;
+			var invalidTrackRecordsCount:int = 0;
 			
 			var active:Boolean = false;
 			var idx:int = 0; // Current index in text array
 			var l:String; // Current processed line in cycle
 			var linesInRecord:int = 0;
+			var isTrackRecord:Boolean;
+			var isPrevRecordTrack:Boolean;
 			
-			var recordHeaderMark:RegExp = /Shipped$/i;
+			var headerLineMark:RegExp = /^([\d-]+) ?#/;
 			var dateInHeaderTpl:RegExp = /^([\d-]+)(?= ?#)/;
-			
-			// Local stats
-			var invalidRecordsCount:int = 0;
+			var trackRecordHeaderMark:RegExp = /Shipped$/i;
 			
 			// Frontwinner format match check
-			if ((txAr[0] as String).search(recordHeaderMark) == -1 || txAr.length < 6)
+			if ((txAr[0] as String).search(headerLineMark) == -1 || txAr.length < 6)
 			{
 				outputLogLine("Ошибка: текст в буфере не походит на формат Frontwinner", COLOR_BAD);
 				return;
@@ -759,18 +766,20 @@ package
 			
 			// Start parsing
 			active = true;
-			allRecords = new Vector.<Object>();
+			allTrackRecords = new Vector.<Object>();
 			
-			// Reset stats
-			tracksCount = existingTracksCount = invalidRecordsCount = 0;
+			// Reset common stats
+			tracksCount = existingTracksCount = 0;
 			
+			// Go through every line of text step by step
 			while (active)
 			{
+				// No more lines to handle
 				if (idx == txAr.length)
 				{
-					// Finish final record
-					if (tmpRecordSourceLines.length != 0) 
-						finishRecord();
+					// Finish final track record (if it was last)
+					if (isTrackRecord && tmpRecordSourceLines.length != 0) 
+						finishTrackRecord();
 					
 					// End of the parsing
 					active = false;
@@ -780,28 +789,39 @@ package
 				l = txAr[idx] as String;
 				idx++;
 				
-				// New record 'Shipped' mark occurrence (Header line)
-				// Header
-				if (l.search(recordHeaderMark) != -1) 
+				// Header (header line mark occurrence)
+				if (l.search(headerLineMark) != -1) 
 				{
-					// First occurrence
-					if (recordsCount == 0) 
+					isPrevRecordTrack = isTrackRecord;
+					isTrackRecord = l.search(trackRecordHeaderMark) != -1 ? true : false;
+					totalRecordsCount++;
+					
+					if (!isTrackRecord)
+						notTrackRecordsCount++;
+					
+					if (totalRecordsCount > 1 && isPrevRecordTrack)
+						finishTrackRecord();
+					
+					if (isTrackRecord)
 					{
-						initNewRecord();
+						initNewTrackRecord();
 					}
-					// Occurrence when filling previous record
 					else
 					{
-						finishRecord();
-						initNewRecord();
+						continue;
 					}
 				}
 				
 				// Not Header (ordinary line)
 				else
 				{
-					// Check whether script is aware of filling record
-					if (recordsCount > 0)
+					// Check: header line should be first in text
+					// otherwise first ordinary line without header before is skipped
+					if (totalRecordsCount == 0)
+						continue;
+					
+					// Check whether script is aware of filling track record
+					if (isTrackRecord)
 					{
 						// Add the line to temp array of record lines
 						// and continue to next
@@ -810,48 +830,46 @@ package
 					}
 					else
 					{
-						// Pass the line
-						// Invalid format (Header line should be first in text)
-						continue;
+						continue; // Just for sake of code clarity
 					}
 				}
 			}
 			
-			function initNewRecord():void 
+			function initNewTrackRecord():void 
 			{
-				currentRecord = {};
+				currentTrackRecord = {};
 				tmpRecordSourceLines = new Vector.<String>();
 				
 				// Retrieve date
 				reAr = l.match(dateInHeaderTpl); // From Header line (it's currently being processed)
-				currentRecord.date = reAr[0];
+				currentTrackRecord.date = reAr[0];
 				
-				recordsCount++;
+				trackRecordsCount++;
 			}
 			
-			function finishRecord():int 
+			function finishTrackRecord():int 
 			{
 				linesInRecord = tmpRecordSourceLines.length;
 				if (linesInRecord < 5) 
 				{
-					outputLogLine("Неверный формат блока " + recordsCount, COLOR_WARN);
-					currentRecord = null; // Invalid record isn't added to final list of records (allRecords)
-					invalidRecordsCount++;
+					outputLogLine("Неверный формат блока " + trackRecordsCount, COLOR_WARN);
+					currentTrackRecord = null; // Invalid record isn't added to final list of records (allRecords)
+					invalidTrackRecordsCount++;
 					return 1;
 				}
 				
-				currentRecord.track = trimSpaces(tmpRecordSourceLines[1]);
-				currentRecord.name = trimSpaces(tmpRecordSourceLines[2]);
-				currentRecord.country = trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-1]); // Last line
-				allRecords.push(currentRecord);
+				currentTrackRecord.track = trimSpaces(tmpRecordSourceLines[1]);
+				currentTrackRecord.name = trimSpaces(tmpRecordSourceLines[2]);
+				currentTrackRecord.country = trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-1]); // Last line
+				allTrackRecords.push(currentTrackRecord);
 				tracksCount++; // Track is considered handled only if record is valid
 				return 0;
 			}
 			
 			// Check
-			if (allRecords.length == 0) 
+			if (allTrackRecords.length == 0) 
 			{
-				outputLogLine("Неверный формат текста", COLOR_BAD);
+				outputLogLine("Ошибка: ни одного блока не найдено", COLOR_BAD);
 				return;
 			}
 			
@@ -869,7 +887,7 @@ package
 			
 			var newFrontwinnerGrp:XML = createXmlGroup("Frontwinner");
 			var rec:Object
-			for each (rec in allRecords) 
+			for each (rec in allTrackRecords) 
 			{
 				newFrontwinnerGrp.appendChild(createXmlTrack(rec.name, rec.track, rec.country, rec.date));
 			}
@@ -915,8 +933,9 @@ package
 			 * Show Stats
 			 * ================================================================================
 			 */
-			outputLogLine("Обработано треков: " + tracksCount + ", всего найдено блоков: " + recordsCount);
-			if (invalidRecordsCount > 0) outputLogLine("Количество неверных блоков: " + invalidRecordsCount, COLOR_WARN);
+			outputLogLine("Обработано треков: " + tracksCount + ", всего найдено блоков: " + totalRecordsCount);
+			if (invalidTrackRecordsCount > 0) outputLogLine("Количество неверных блоков: " + invalidTrackRecordsCount, COLOR_BAD);
+			if (notTrackRecordsCount > 0) outputLogLine("Пропущенные блоки: " + notTrackRecordsCount, COLOR_WARN);
 			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
