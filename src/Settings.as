@@ -21,6 +21,7 @@ package {
 		public static const sourceExcelFile:String = "sourceExcelFile";
 		public static const trackCheckerDataFile:String = "trackCheckerDataFile";
 		public static const winPos:String = "winPos";
+		public static const prcMode:String = "prcMode";
 
 		private var main:Main;
 		private var allSets:Object;
@@ -42,6 +43,7 @@ package {
 			allSets[sourceExcelFile] 				= new Setting(sourceExcelFile, String, "", "1.0");
 			allSets[trackCheckerDataFile] 			= new Setting(trackCheckerDataFile, String, "", "1.0");
 			allSets[winPos]							= new Setting(winPos, String, "374:163", "1.0");
+			allSets[prcMode]						= new Setting(prcMode, int, 1, "6.0");
 
 			sets = {};
 			settingsFile = File.applicationStorageDirectory.resolvePath("settings.json");

@@ -1,7 +1,7 @@
 :user_configuration
 
 :: Path to Flex SDK
-set FLEX_SDK=C:\Installed Soft\FD\Tools\flexsdk
+set FLEX_SDK=C:\Installed Soft\FD\Tools\sdk
 
 :validation
 if not exist "%FLEX_SDK%" goto flexsdk
