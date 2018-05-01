@@ -429,7 +429,9 @@ package
 		{
 			// Preparing data.xml
 			trace("XML Data File: reading done");
+			fst.removeEventListener(ProgressEvent.PROGRESS, onXMLFileLoadingProgress);
 			fst.removeEventListener(Event.COMPLETE, onXMLFileLoadingDone);
+			
 			trace("Bytes Available " + fst.bytesAvailable);
 			xmlString = fst.readUTFBytes(fst.bytesAvailable)
 			fst.close();
@@ -1015,6 +1017,7 @@ package
 			fst.openAsync(xmlFile, FileMode.WRITE);
 			fst.writeUTFBytes(outputStr);
 			fst.close();
+			outputLogLine("Добавлено в TrackChecker", COLOR_SUCCESS);
 		}
 		
 		private function writeToOutputFile(xml:XML):void 

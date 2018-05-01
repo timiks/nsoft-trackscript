@@ -14,9 +14,10 @@ package
 		private static var $ins:Main;
 		
 		// Version
-		private const $version:int = 5;
-		private const $versionService:int = 1;
+		private const $version:int = 6;
+		private const $versionService:int = 0;
 		private const $betaVersion:Boolean = false;
+		private const $betaVersionNumber:int = 0;
 		private const bugs:Boolean = false;
 		
 		// Functional Members
@@ -102,7 +103,11 @@ package
 		{
 			var vr:String = String($version);
 			if ($versionService > 0) vr += "." + String($versionService);
-			if ($betaVersion) vr += " β";
+			if ($betaVersion)
+			{
+				vr += " β";
+				if ($betaVersionNumber > 0) vr += String($betaVersionNumber);
+			}
 			return vr;
 		}
 		
