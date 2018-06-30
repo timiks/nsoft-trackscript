@@ -40,7 +40,8 @@ package
 		private var win:NativeWindow;
 		
 		private var btnFWMode:ModeButton;
-		private var btnCantonMode:ModeButton;
+		private var btnCantonMode1:ModeButton;
+		private var btnCantonMode2:ModeButton;
 		
 		private const COLOR_BAD:String = "#CC171C"; // Red
 		private const COLOR_SUCCESS:String = "#189510"; // Green
@@ -48,7 +49,8 @@ package
 		private const COLOR_SPECIAL:String = "#0075BF"; // Blue
 		
 		private const PRCMODE_FRONTWINNER:int = 1;
-		private const PRCMODE_CANTON_WH:int = 2;
+		private const PRCMODE_CANTON_WH_1:int = 2;
+		private const PRCMODE_CANTON_WH_2:int = 3;
 		
 		private var prcMode:int;
 		private var currentPrcModeButton:ModeButton;
@@ -131,8 +133,10 @@ package
 			// Mode buttons
 			btnFWMode = new ModeButton(ui.btnFWMode, PRCMODE_FRONTWINNER);
 			btnFWMode.addEventListener("click", onModeButtonClick);
-			btnCantonMode = new ModeButton(ui.btnCantonMode, PRCMODE_CANTON_WH);
-			btnCantonMode.addEventListener("click", onModeButtonClick);
+			btnCantonMode1 = new ModeButton(ui.btnCantonMode1, PRCMODE_CANTON_WH_1);
+			btnCantonMode1.addEventListener("click", onModeButtonClick);
+			btnCantonMode2 = new ModeButton(ui.btnCantonMode2, PRCMODE_CANTON_WH_2);
+			btnCantonMode2.addEventListener("click", onModeButtonClick);
 			
 			function onModeButtonClick(e:Event):void 
 			{
@@ -358,8 +362,12 @@ package
 					modeBtn = btnFWMode;
 					break;
 					
-				case PRCMODE_CANTON_WH:
-					modeBtn = btnCantonMode;
+				case PRCMODE_CANTON_WH_1:
+					modeBtn = btnCantonMode1;
+					break;
+					
+				case PRCMODE_CANTON_WH_2:
+					modeBtn = btnCantonMode2;
 					break;
 					
 				default:
@@ -465,8 +473,9 @@ package
 					processFrontwinnerMode();
 					break;
 					
-				// Canton warehouse
-				case PRCMODE_CANTON_WH:
+				// Canton warehouse modes 1 and 2 (one processing function)
+				case PRCMODE_CANTON_WH_1:
+				case PRCMODE_CANTON_WH_2:
 					startLoadingCantonExcelFile();
 					break;
 					
@@ -487,14 +496,19 @@ package
 			
 			// Load excel file (Canton warehouse format)
 			xlLoader = new XLSXLoader();
-			xlLoader.addEventListener(Event.COMPLETE, processCantonExcelMode);
+			xlLoader.addEventListener(Event.COMPLETE, processCantonExcelModes1and2);
 			xlLoader.load(ui.tfXlFile.text);
-			outputLogLine("Загрузка файла Excel в формате склада Кантона", COLOR_SPECIAL);
+			
+			outputLogLine(
+				"Загрузка файла Excel в формате склада Кантона. Формат #" +
+				(prcMode == PRCMODE_CANTON_WH_1 ? "1" : "2"), 
+				COLOR_SPECIAL
+			);
 		}
 		
-		private function processCantonExcelMode(e:Event):void
+		private function processCantonExcelModes1and2(e:Event):void
 		{
-			xlLoader.removeEventListener(Event.COMPLETE, processCantonExcelMode);
+			xlLoader.removeEventListener(Event.COMPLETE, processCantonExcelModes1and2);
 			xlSheet = xlLoader.worksheet("Sheet1");
 			
 			if (xlSheet.getCellValue("A1").search(/Parcel List/i) == -1)
@@ -502,6 +516,10 @@ package
 				outputLogLine("Неверный формат Excel", COLOR_BAD);
 				return;
 			}
+			
+			// Local shortcuts for Canton modes
+			var md1:Boolean = (prcMode == PRCMODE_CANTON_WH_1);
+			var md2:Boolean = (prcMode == PRCMODE_CANTON_WH_2);
 			
 			/**
 			 * Parsing Canton Excel Format
@@ -530,12 +548,12 @@ package
 			
 			var groupColVal:String;
 			var trackColVal:String;
-			var adrColVal:String;
-			//var nameColVal:String;
-			//var cntColVal:String;
+			var adrColVal:String; // Mode 1 only
+			var nameColVal:String; // Mode 2 only
+			var cntColVal:String; // Mode 2 only
 			
 			var trackCol:String;
-			var trackColumns:Array = ["J"];
+			var trackColumns:Array = md1 ? ["J"] : ["H"];
 			
 			var groupName:String;
 			var name:String;
@@ -572,25 +590,51 @@ package
 				
 				groupColVal = xlSheet.getCellValue("C" + row);
 				trackColVal = xlSheet.getCellValue(trackCol + row);
-				adrColVal = xlSheet.getCellValue("H" + row);
-				//nameColVal = xlSheet.getCellValue("E" + row);
-				//cntColVal = xlSheet.getCellValue("J" + row);
 				
-				if (groupColVal == "" && trackColVal == "" && adrColVal == "")
+				if (md1)
 				{
-					wholeLineIsEmpty = true;
+					adrColVal = xlSheet.getCellValue("H" + row);
 				}
 				
-				if (adrColVal == "" || adrColVal == null)
+				else if (md2)
 				{
-					!wholeLineIsEmpty && outputLogLine("Пустой адрес на строке " + row, COLOR_WARN);
+					nameColVal = xlSheet.getCellValue("K" + row);
+					cntColVal = xlSheet.getCellValue("J" + row);
 				}
-				else
+				
+				// ================================================================================
+				
+				if (md1)
 				{
-					var adrObj:Object = parseAddressCell(adrColVal);
-					name = adrObj.name;
-					country = adrObj.country;
+					if (groupColVal == "" && trackColVal == "" && adrColVal == "")
+					{
+						wholeLineIsEmpty = true;
+					}
+					
+					if (adrColVal == "" || adrColVal == null)
+					{
+						!wholeLineIsEmpty && outputLogLine("Пустой адрес на строке " + row, COLOR_WARN);
+					}
+					else
+					{
+						var adrObj:Object = parseAddressCell(adrColVal);
+						name = adrObj.name;
+						country = adrObj.country;
+					}
 				}
+				
+				else if (md2)
+				{
+					if (groupColVal == "" && trackColVal == "" && cntColVal == "")
+					{
+						wholeLineIsEmpty = true;
+					}
+					
+					name = trimSpaces(nameColVal);
+					country = trimSpaces(cntColVal);
+				}
+				
+				// ================================================================================
 				
 				if (trackColVal == "")
 				{
@@ -637,6 +681,7 @@ package
 			// Write result of script work to output.xml
 			groups.@date = getFormattedDate("dd.MM.yyyy HH:mm:ss");
 			groups.@version = main.version;
+			groups.@format = md1 ? "Canton #1" : "Canton #2";
 			groups.@excel = ui.tfXlFile.text;
 			
 			writeToOutputFile(groups);
@@ -977,6 +1022,7 @@ package
 			output.appendChild(newFrontwinnerGrp);
 			output.@date = getFormattedDate("dd.MM.yyyy HH:mm:ss");
 			output.@version = main.version;
+			output.@format = "Frontwinner";
 			writeToOutputFile(output);
 			
 			/**

@@ -14,11 +14,11 @@ package
 		private static var $ins:Main;
 		
 		// Version
-		private const $version:int = 6;
-		private const $versionService:int = 0;
-		private const $betaVersion:Boolean = false;
-		private const $betaVersionNumber:int = 0;
-		private const bugs:Boolean = false;
+		private const $version:int 				= 7;
+		private const $versionService:int 		= 0;
+		private const $betaVersion:Boolean 		= false;
+		private const $betaVersionNumber:int 	= 0;
+		private const bugs:Boolean 				= false;
 		
 		// Functional Members
 		private var $settings:Settings;
