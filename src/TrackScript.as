@@ -581,6 +581,24 @@ package
 			
 			outputLogLine("Колонка с треками: " + trackCol);
 			
+			// Date parse (Mode 2 only)
+			if (md2)
+			{
+				var tableDate:String = trimSpaces(xlSheet.getCellValue("A3"));
+				var tableDateRegExPattern:RegExp = /(\d{2})\.(\d{2})\.(\d{4})/;
+				
+				if (tableDate.search(tableDateRegExPattern) == -1)
+				{
+					tableDate = null;
+				}
+				
+				else
+				{
+					var re:Array = tableDate.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+					tableDate = re[3] + "-" + re[2] + "-" + re[1];
+				}
+			}
+			
 			active = true;
 			
 			while (active)
@@ -673,7 +691,8 @@ package
 				//name = trimSpaces(nameColVal);
 				//country = trimSpaces(cntColVal);
 				
-				var xmlTrack:XML = createXmlTrack(name, track, country);
+				// [!] Special date for Mode 2
+				var xmlTrack:XML = createXmlTrack(name, track, country, (md2 && tableDate != null) ? tableDate : null);
 				currentGroup.appendChild(xmlTrack);
 				tracksCount++;
 			}
