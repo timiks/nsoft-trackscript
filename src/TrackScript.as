@@ -460,7 +460,7 @@ package
 			maxID = maxIDDefault = uint(dataXml.@maxid);
 			trace("MAX ID:", dataXml.@maxid);
 			
-			outputLogLine("MaxID: " + String(maxID) + "; " + "Элементов в корневой группе: " + String(rootNodesCount));
+			outputLogLine("Имеющиеся группы в корне: " + String(rootNodesCount));
 			
 			// Capture current date to use it in XML output
 			currentDate = printDate();
@@ -590,11 +590,13 @@ package
 				if (tableDate.search(tableDateRegExPattern) == -1)
 				{
 					tableDate = null;
+					outputLogLine("Не найдена дата в файле. Текущая дата записана в событие «Added» всех треков", COLOR_WARN);
 				}
 				
 				else
 				{
-					var re:Array = tableDate.match(/(\d{2})\.(\d{2})\.(\d{4})/);
+					outputLogLine("Дата " + tableDate + " из файла записана в событие «Added» всех треков", COLOR_SPECIAL);
+					var re:Array = tableDate.match(tableDateRegExPattern);
 					tableDate = re[3] + "-" + re[2] + "-" + re[1];
 				}
 			}
