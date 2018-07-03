@@ -553,7 +553,7 @@ package
 			var cntColVal:String; // Mode 2 only
 			
 			var trackCol:String;
-			var trackColumns:Array = md1 ? ["J"] : ["H"];
+			var trackColumns:Array = md1 ? ["J"] : ["H", "P", "Q"];
 			
 			var groupName:String;
 			var name:String;
