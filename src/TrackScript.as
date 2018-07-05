@@ -23,6 +23,7 @@ package
 	import flash.filesystem.FileStream;
 	import flash.globalization.DateTimeFormatter;
 	import flash.net.FileFilter;
+	import flash.net.FileReference;
 	import flash.system.Capabilities;
 	import flash.text.TextField;
 	import flash.text.TextFormat;
@@ -38,6 +39,10 @@ package
 		private var main:Main;
 		private var ui:UI;
 		private var win:NativeWindow;
+		
+		private const undoDirName:String = "undo";
+		private const UNDO_NUMBER:int = 4;
+		private var undoDir:File;
 		
 		private var btnFWMode:ModeButton;
 		private var btnCantonMode1:ModeButton;
@@ -170,6 +175,9 @@ package
 			fst.close();
 			
 			srvsObj = parseServicesFile(srvsFileString);
+			
+			// Resolve Undo dir
+			undoDir = File.applicationStorageDirectory.resolvePath(undoDirName);
 			
 			// Check dev marker-file
 			if (File.applicationStorageDirectory.resolvePath("dev").exists)
@@ -1077,6 +1085,24 @@ package
 		
 		private function writeBackToXMLFile():void 
 		{
+			// Backup untouched dataXml file before update it
+			var undoFileBackup:FileReference;
+			var date:Date = new Date();
+			var dtf:DateTimeFormatter = new DateTimeFormatter("ru-RU");
+			var dstr:String;
+			
+			dtf.setDateTimePattern("dd.MM.yy-HH.mm.ss");
+			dstr = dtf.format(date);
+			undoFileBackup = undoDir.resolvePath("launch-" + dstr + ".xml");
+			
+			xmlFile.copyToAsync(undoFileBackup, true);
+			xmlFile.addEventListener(Event.COMPLETE, writeBackToXMLFile_p2);
+		}
+		
+		private function writeBackToXMLFile_p2(e:Event):void 
+		{
+			xmlFile.removeEventListener(Event.COMPLETE, writeBackToXMLFile_p2);
+			
 			dataXml.@maxid = maxID; // Update MaxID
 			XML.prettyPrinting = false;
 			var outputStr:String = dataXml.toXMLString();
@@ -1084,7 +1110,44 @@ package
 			fst.openAsync(xmlFile, FileMode.WRITE);
 			fst.writeUTFBytes(outputStr);
 			fst.close();
+			
 			outputLogLine("Добавлено в TrackChecker", COLOR_SUCCESS);
+			checkUndoFilesForCleanup();
+		}
+				
+		private function checkUndoFilesForCleanup():void 
+		{
+			main.logRed("Checking undo files for cleanup");
+			var dirContents:Array = undoDir.getDirectoryListing();
+			
+			if (dirContents.length == 0 || dirContents.length <= UNDO_NUMBER)
+				return;
+			
+			var sortedFiles:Array = [];
+			
+			for each (var f:File in dirContents)
+			{
+				sortedFiles.push({ts: f.creationDate.time, file: f});
+			}
+			
+			sortedFiles.sortOn("ts", Array.NUMERIC | Array.DESCENDING);
+			
+			if (sortedFiles.length >= UNDO_NUMBER)
+			{
+				var removed:Object;
+				var dif:Number = sortedFiles.length - UNDO_NUMBER;
+				for (var i:int = 0; i < dif; i++) 
+				{	
+					removed = sortedFiles.pop();
+					removeFile(removed.file as File);
+				}
+			}
+			
+			function removeFile(f:File):void
+			{
+				f.deleteFileAsync();
+				main.logRed("File \"" + f.name + "\" has been removed");
+			}
 		}
 		
 		private function writeToOutputFile(xml:XML):void 
