@@ -777,7 +777,8 @@ package
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
-				outputLogLine("Похоже кто-то прогнал меня два раза", COLOR_BAD);
+				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				return;
 			}
 			
 			if (Capabilities.isDebugger || devFlag)
@@ -1065,7 +1066,8 @@ package
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
-				outputLogLine("Похоже кто-то прогнал меня два раза", COLOR_BAD);
+				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				return;
 			}
 			
 			if (Capabilities.isDebugger || devFlag)
