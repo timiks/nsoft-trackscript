@@ -719,51 +719,74 @@ package
 			 * Filling source XML (dataXml) with generated groups
 			 * ================================================================================
 			 */
+			// Shortcut to source XML's root group
+			var rootGroup:XML = dataXml.groups.(@id == 0)[0];
+			
 			// Iterate through our groups
-			for each (var grp:XML in groups.groups)
+			for each (var tscriptGrp:XML in groups.groups)
 			{
-				trace("Group:", grp.@desc);
+				trace("Group:", tscriptGrp.@desc);
 				
 				// Check if this group already exists
+				var tcheckerExistingGroups:XMLList = rootGroup..groups.(@desc == tscriptGrp.@desc);
+				
 				// If exists
-				var x:* = dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc);
-				if (x.length() > 0)
+				if (tcheckerExistingGroups.length() > 0)
 				{
-					// Compare tracks in existing group to our current group
-					for each (var tr:XML in groups.groups.(@desc == grp.@desc).track)
+					var tcheckerExistingGroup:XML;
+					
+					// Compare tracks in all existing groups to our current group
+					for each (var tscriptGrpTrack:XML in tscriptGrp.track)
 					{
-						trace("Track:", tr.@track);
+						trace("TScript Track:", tscriptGrpTrack.@track);
 						
-						// Track Existence Check
-						// If found duplicate > skip this track
-						x = dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc).track.(@desc == tr.@desc && @track == tr.@track);
-						if (x.length() > 0)
+						// One operation on possible multiple dupes of our group
+						for each (tcheckerExistingGroup in tcheckerExistingGroups)
 						{
-							main.logRed("Track Duplicate Found: " + tr.@desc + " " + tr.@track);
-							existingTracksCount++;
-							continue;
-						}
-						
-						// If not found > add this track to existing group
-						else
-						{
-							for each (var subGroup:XML in dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc))
+							// [!] [!] [!] TEMP [!] [!] [!]
+							// SPECIAL
+							// Fix wrong job
+							var tcheckerExistingGroupTrackDups:XMLList = tcheckerExistingGroup.track.(@track == tscriptGrpTrack.@track);
+							if (tcheckerExistingGroupTrackDups.length() > 0)
 							{
-								subGroup.appendChild(tr);
+								main.logRed("Track Duplicate Found (FIX MODE): " + tscriptGrpTrack.@desc + " " + tscriptGrpTrack.@track);
+								existingTracksCount++;
+								
+								// Da Fix
+								var idx:int;
+								var daChildrenList:XMLList;
+								var dupTrack:XML;
+								var daDupTracksList:XMLList;
+								var daNodeBeforeDupTrackNode:*;
+								
+								daChildrenList = tcheckerExistingGroup.children();
+								daDupTracksList = tcheckerExistingGroupTrackDups;
+								
+								for each (dupTrack in daDupTracksList)
+								{
+									idx = dupTrack.childIndex();
+									daNodeBeforeDupTrackNode = daChildrenList[idx - 1];
+									delete daChildrenList[idx];
+									tcheckerExistingGroup.insertChildAfter(daNodeBeforeDupTrackNode, tscriptGrpTrack);
+								}
 							}
-							//dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc)[0].appendChild(tr);
+							
+							else
+							{
+								tcheckerExistingGroup.appendChild(tscriptGrpTrack);
+							}
 						}
 					}
 					
 					// Stats
-					existingGroupsCount++;
+					existingGroupsCount++; // Our groups (there can be even more dupes of our group)
 					
 					// Skip to our next group
 					continue;
 				}
 				
 				// Add new groups to root group in Source XML
-				dataXml.groups.(@id == 0).appendChild(grp);
+				rootGroup.appendChild(tscriptGrp);
 			}
 			
 			/**
