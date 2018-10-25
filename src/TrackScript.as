@@ -23,6 +23,7 @@ package
 	import flash.filesystem.FileStream;
 	import flash.globalization.DateTimeFormatter;
 	import flash.net.FileFilter;
+	import flash.net.FileReference;
 	import flash.system.Capabilities;
 	import flash.text.TextField;
 	import flash.text.TextFormat;
@@ -38,6 +39,10 @@ package
 		private var main:Main;
 		private var ui:UI;
 		private var win:NativeWindow;
+		
+		private const undoDirName:String = "undo";
+		private const UNDO_NUMBER:int = 4;
+		private var undoDir:File;
 		
 		private var btnFWMode:ModeButton;
 		private var btnCantonMode1:ModeButton;
@@ -59,6 +64,24 @@ package
 		private var devFlag:Boolean = false;
 		private var runsCount:int;
 		
+		private var fst:FileStream;
+		private var xlLoader:XLSXLoader;
+		private var xlSheet:Worksheet;
+		private var xlFile:File;
+		private var xmlFile:File;
+		private var dataXml:XML;
+		private var xmlString:String;
+		
+		private var maxIDDefault:uint;
+		private var maxID:uint;
+		private var currentDate:String;
+		
+		// Common stats for all modes
+		private var tracksCount:uint;
+		private var existingTracksCount:uint;
+		
+		private var srvsObj:Object = {};
+		
 		public function TrackScript():void
 		{
 			stage ? init() : addEventListener(Event.ADDED_TO_STAGE, init);
@@ -78,7 +101,7 @@ package
 			ui.tfVer.text = "v" + main.version;
 			
 			var winPosStr:String = main.settings.getKey(Settings.winPos);
-			var reResult:Array = winPosStr.match(/(\d+):(\d+)/);
+			var reResult:Array = winPosStr.match(/(-?\d+):(-?\d+)/);
 			win.x = Number(reResult[1]);
 			win.y = Number(reResult[2]);
 			
@@ -170,6 +193,9 @@ package
 			fst.close();
 			
 			srvsObj = parseServicesFile(srvsFileString);
+			
+			// Resolve Undo dir
+			undoDir = File.applicationStorageDirectory.resolvePath(undoDirName);
 			
 			// Check dev marker-file
 			if (File.applicationStorageDirectory.resolvePath("dev").exists)
@@ -383,24 +409,6 @@ package
 			currentPrcModeButton = modeBtn;
 			currentPrcModeButton.active = true;
 		}
-		
-		private var fst:FileStream;
-		private var xlLoader:XLSXLoader;
-		private var xlSheet:Worksheet;
-		private var xlFile:File;
-		private var xmlFile:File;
-		private var dataXml:XML;
-		private var xmlString:String;
-		
-		private var maxIDDefault:uint;
-		private var maxID:uint;
-		private var currentDate:String;
-		
-		// Common stats for all modes
-		private var tracksCount:uint;
-		private var existingTracksCount:uint;
-		
-		private var srvsObj:Object = {};
 		
 		private function start():void
 		{
@@ -711,51 +719,55 @@ package
 			 * Filling source XML (dataXml) with generated groups
 			 * ================================================================================
 			 */
+			// Shortcut to source XML's root group
+			var rootGroup:XML = dataXml.groups.(@id == 0)[0];
+			
 			// Iterate through our groups
-			for each (var grp:XML in groups.groups)
+			for each (var tscriptGrp:XML in groups.groups)
 			{
-				trace("Group:", grp.@desc);
+				trace("TScript Group:", tscriptGrp.@desc);
 				
 				// Check if this group already exists
+				var tcheckerExistingGroups:XMLList = rootGroup..groups.(@desc == tscriptGrp.@desc);
+				
 				// If exists
-				var x:* = dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc);
-				if (x.length() > 0)
+				if (tcheckerExistingGroups.length() > 0)
 				{
-					// Compare tracks in existing group to our current group
-					for each (var tr:XML in groups.groups.(@desc == grp.@desc).track)
+					var tcheckerExistingGroup:XML;
+					
+					// Compare tracks in all existing groups to our current group
+					tracksLoop:
+					for each (var tscriptGrpTrack:XML in tscriptGrp.track)
 					{
-						trace("Track:", tr.@track);
+						trace("TScript Track:", tscriptGrpTrack.@track);
 						
-						// Track Existence Check
-						// If found duplicate > skip this track
-						x = dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc).track.(@desc == tr.@desc && @track == tr.@track);
-						if (x.length() > 0)
+						// One operation on possible multiple dupes of our group
+						for each (tcheckerExistingGroup in tcheckerExistingGroups)
 						{
-							main.logRed("Track Duplicate Found: " + tr.@desc + " " + tr.@track);
-							existingTracksCount++;
-							continue;
-						}
-						
-						// If not found > add this track to existing group
-						else
-						{
-							for each (var subGroup:XML in dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc))
+							var tcheckerExistingGroupTrackDups:XMLList = tcheckerExistingGroup.track.(@track == tscriptGrpTrack.@track);
+							if (tcheckerExistingGroupTrackDups.length() > 0)
 							{
-								subGroup.appendChild(tr);
+								main.logRed("Track Duplicate Found: " + tscriptGrpTrack.@desc + " " + tscriptGrpTrack.@track);
+								existingTracksCount++;
+								continue tracksLoop;
 							}
-							//dataXml.groups.(@id == 0)..groups.(@desc == grp.@desc)[0].appendChild(tr);
+							
+							else
+							{
+								tcheckerExistingGroup.appendChild(tscriptGrpTrack);
+							}
 						}
 					}
 					
 					// Stats
-					existingGroupsCount++;
+					existingGroupsCount++; // Our groups (there can be even more dupes of our group)
 					
 					// Skip to our next group
 					continue;
 				}
 				
 				// Add new groups to root group in Source XML
-				dataXml.groups.(@id == 0).appendChild(grp);
+				rootGroup.appendChild(tscriptGrp);
 			}
 			
 			/**
@@ -769,7 +781,8 @@ package
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
-				outputLogLine("Похоже кто-то прогнал меня два раза", COLOR_BAD);
+				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				return;
 			}
 			
 			if (Capabilities.isDebugger || devFlag)
@@ -783,8 +796,6 @@ package
 			 * ================================================================================
 			 */
 			writeBackToXMLFile();
-			
-			outputLogLine("Готово", COLOR_SUCCESS);
 		}
 		
 		private function processFrontwinnerMode():void 
@@ -1057,7 +1068,8 @@ package
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
-				outputLogLine("Похоже кто-то прогнал меня два раза", COLOR_BAD);
+				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				return;
 			}
 			
 			if (Capabilities.isDebugger || devFlag)
@@ -1071,12 +1083,28 @@ package
 			 * ================================================================================
 			 */
 			writeBackToXMLFile();
-			
-			outputLogLine("Готово", COLOR_SUCCESS);
 		}
 		
 		private function writeBackToXMLFile():void 
 		{
+			// Backup untouched dataXml file before update it
+			var undoFileBackup:FileReference;
+			var date:Date = new Date();
+			var dtf:DateTimeFormatter = new DateTimeFormatter("ru-RU");
+			var dstr:String;
+			
+			dtf.setDateTimePattern("dd.MM.yy-HH.mm.ss");
+			dstr = dtf.format(date);
+			undoFileBackup = undoDir.resolvePath("launch-" + dstr + ".xml");
+			
+			xmlFile.copyToAsync(undoFileBackup, true);
+			xmlFile.addEventListener(Event.COMPLETE, writeBackToXMLFile_p2);
+		}
+		
+		private function writeBackToXMLFile_p2(e:Event):void 
+		{
+			xmlFile.removeEventListener(Event.COMPLETE, writeBackToXMLFile_p2);
+			
 			dataXml.@maxid = maxID; // Update MaxID
 			XML.prettyPrinting = false;
 			var outputStr:String = dataXml.toXMLString();
@@ -1084,7 +1112,44 @@ package
 			fst.openAsync(xmlFile, FileMode.WRITE);
 			fst.writeUTFBytes(outputStr);
 			fst.close();
-			outputLogLine("Добавлено в TrackChecker", COLOR_SUCCESS);
+			
+			outputLogLine("Готово. Добавлено в TrackChecker", COLOR_SUCCESS);
+			checkUndoFilesForCleanup();
+		}
+				
+		private function checkUndoFilesForCleanup():void 
+		{
+			main.logRed("Checking undo files for cleanup");
+			var dirContents:Array = undoDir.getDirectoryListing();
+			
+			if (dirContents.length == 0 || dirContents.length <= UNDO_NUMBER)
+				return;
+			
+			var sortedFiles:Array = [];
+			
+			for each (var f:File in dirContents)
+			{
+				sortedFiles.push({ts: f.creationDate.time, file: f});
+			}
+			
+			sortedFiles.sortOn("ts", Array.NUMERIC | Array.DESCENDING);
+			
+			if (sortedFiles.length >= UNDO_NUMBER)
+			{
+				var removed:Object;
+				var dif:Number = sortedFiles.length - UNDO_NUMBER;
+				for (var i:int = 0; i < dif; i++) 
+				{	
+					removed = sortedFiles.pop();
+					removeFile(removed.file as File);
+				}
+			}
+			
+			function removeFile(f:File):void
+			{
+				f.deleteFileAsync();
+				main.logRed("File \"" + f.name + "\" has been removed");
+			}
 		}
 		
 		private function writeToOutputFile(xml:XML):void 
@@ -1111,7 +1176,7 @@ package
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
 			
-			var servAliases:Array = ["china", "china_alt", "china_ems"];
+			var servAliases:Array = ["china_ems"];
 			var servAlias:String;
 			
 			for each (servAlias in servAliases)
