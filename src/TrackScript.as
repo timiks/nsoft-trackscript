@@ -1176,7 +1176,7 @@ package
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
 			
-			var servAliases:Array = ["china", "china_alt", "china_ems"];
+			var servAliases:Array = ["china_ems"];
 			var servAlias:String;
 			
 			for each (servAlias in servAliases)
