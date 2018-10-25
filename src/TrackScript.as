@@ -64,6 +64,24 @@ package
 		private var devFlag:Boolean = false;
 		private var runsCount:int;
 		
+		private var fst:FileStream;
+		private var xlLoader:XLSXLoader;
+		private var xlSheet:Worksheet;
+		private var xlFile:File;
+		private var xmlFile:File;
+		private var dataXml:XML;
+		private var xmlString:String;
+		
+		private var maxIDDefault:uint;
+		private var maxID:uint;
+		private var currentDate:String;
+		
+		// Common stats for all modes
+		private var tracksCount:uint;
+		private var existingTracksCount:uint;
+		
+		private var srvsObj:Object = {};
+		
 		public function TrackScript():void
 		{
 			stage ? init() : addEventListener(Event.ADDED_TO_STAGE, init);
@@ -83,7 +101,7 @@ package
 			ui.tfVer.text = "v" + main.version;
 			
 			var winPosStr:String = main.settings.getKey(Settings.winPos);
-			var reResult:Array = winPosStr.match(/(\d+):(\d+)/);
+			var reResult:Array = winPosStr.match(/(-?\d+):(-?\d+)/);
 			win.x = Number(reResult[1]);
 			win.y = Number(reResult[2]);
 			
@@ -391,24 +409,6 @@ package
 			currentPrcModeButton = modeBtn;
 			currentPrcModeButton.active = true;
 		}
-		
-		private var fst:FileStream;
-		private var xlLoader:XLSXLoader;
-		private var xlSheet:Worksheet;
-		private var xlFile:File;
-		private var xmlFile:File;
-		private var dataXml:XML;
-		private var xmlString:String;
-		
-		private var maxIDDefault:uint;
-		private var maxID:uint;
-		private var currentDate:String;
-		
-		// Common stats for all modes
-		private var tracksCount:uint;
-		private var existingTracksCount:uint;
-		
-		private var srvsObj:Object = {};
 		
 		private function start():void
 		{
@@ -725,7 +725,7 @@ package
 			// Iterate through our groups
 			for each (var tscriptGrp:XML in groups.groups)
 			{
-				trace("Group:", tscriptGrp.@desc);
+				trace("TScript Group:", tscriptGrp.@desc);
 				
 				// Check if this group already exists
 				var tcheckerExistingGroups:XMLList = rootGroup..groups.(@desc == tscriptGrp.@desc);
@@ -736,6 +736,7 @@ package
 					var tcheckerExistingGroup:XML;
 					
 					// Compare tracks in all existing groups to our current group
+					tracksLoop:
 					for each (var tscriptGrpTrack:XML in tscriptGrp.track)
 					{
 						trace("TScript Track:", tscriptGrpTrack.@track);
@@ -743,32 +744,12 @@ package
 						// One operation on possible multiple dupes of our group
 						for each (tcheckerExistingGroup in tcheckerExistingGroups)
 						{
-							// [!] [!] [!] TEMP [!] [!] [!]
-							// SPECIAL
-							// Fix wrong job
 							var tcheckerExistingGroupTrackDups:XMLList = tcheckerExistingGroup.track.(@track == tscriptGrpTrack.@track);
 							if (tcheckerExistingGroupTrackDups.length() > 0)
 							{
-								main.logRed("Track Duplicate Found (FIX MODE): " + tscriptGrpTrack.@desc + " " + tscriptGrpTrack.@track);
+								main.logRed("Track Duplicate Found: " + tscriptGrpTrack.@desc + " " + tscriptGrpTrack.@track);
 								existingTracksCount++;
-								
-								// Da Fix
-								var idx:int;
-								var daChildrenList:XMLList;
-								var dupTrack:XML;
-								var daDupTracksList:XMLList;
-								var daNodeBeforeDupTrackNode:*;
-								
-								daChildrenList = tcheckerExistingGroup.children();
-								daDupTracksList = tcheckerExistingGroupTrackDups;
-								
-								for each (dupTrack in daDupTracksList)
-								{
-									idx = dupTrack.childIndex();
-									daNodeBeforeDupTrackNode = daChildrenList[idx - 1];
-									delete daChildrenList[idx];
-									tcheckerExistingGroup.insertChildAfter(daNodeBeforeDupTrackNode, tscriptGrpTrack);
-								}
+								continue tracksLoop;
 							}
 							
 							else
@@ -815,8 +796,6 @@ package
 			 * ================================================================================
 			 */
 			writeBackToXMLFile();
-			
-			outputLogLine("Готово", COLOR_SUCCESS);
 		}
 		
 		private function processFrontwinnerMode():void 
@@ -1104,8 +1083,6 @@ package
 			 * ================================================================================
 			 */
 			writeBackToXMLFile();
-			
-			outputLogLine("Готово", COLOR_SUCCESS);
 		}
 		
 		private function writeBackToXMLFile():void 
@@ -1136,7 +1113,7 @@ package
 			fst.writeUTFBytes(outputStr);
 			fst.close();
 			
-			outputLogLine("Добавлено в TrackChecker", COLOR_SUCCESS);
+			outputLogLine("Готово. Добавлено в TrackChecker", COLOR_SUCCESS);
 			checkUndoFilesForCleanup();
 		}
 				
