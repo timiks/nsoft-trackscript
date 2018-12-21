@@ -2,6 +2,7 @@ package
 {
 	import com.childoftv.xlsxreader.Worksheet;
 	import com.childoftv.xlsxreader.XLSXLoader;
+	import entities.ShenzhenPackage;
 	import fl.controls.Button;
 	import fl.controls.TextInput;
 	import flash.desktop.Clipboard;
@@ -47,6 +48,7 @@ package
 		private var btnFWMode:ModeButton;
 		private var btnCantonMode1:ModeButton;
 		private var btnCantonMode2:ModeButton;
+		private var btnShenzhen:ModeButton;
 		
 		private const COLOR_BAD:String = "#CC171C"; // Red
 		private const COLOR_SUCCESS:String = "#189510"; // Green
@@ -56,6 +58,7 @@ package
 		private const PRCMODE_FRONTWINNER:int = 1;
 		private const PRCMODE_CANTON_WH_1:int = 2;
 		private const PRCMODE_CANTON_WH_2:int = 3;
+		private const PRCMODE_SHENZHEN:int = 4;
 		
 		private var prcMode:int;
 		private var currentPrcModeButton:ModeButton;
@@ -67,6 +70,7 @@ package
 		private var fst:FileStream;
 		private var xlLoader:XLSXLoader;
 		private var xlSheet:Worksheet;
+		private var xlColLetters:Array;
 		private var xlFile:File;
 		private var xmlFile:File;
 		private var dataXml:XML;
@@ -75,6 +79,7 @@ package
 		private var maxIDDefault:uint;
 		private var maxID:uint;
 		private var currentDate:String;
+		private var userDefinedDate:Date;
 		
 		// Common stats for all modes
 		private var tracksCount:uint;
@@ -136,6 +141,8 @@ package
 			ui.tfXlFile.setStyle("disabledTextFormat", tfTextFormat);
 			ui.tfXmlFile.setStyle("textFormat", tfTextFormat);
 			ui.tfXmlFile.setStyle("disabledTextFormat", tfTextFormat);
+			ui.tfUserDate.setStyle("textFormat", tfTextFormat);
+			ui.tfUserDate.setStyle("disabledTextFormat", tfTextFormat);
 			ui.taOutput.setStyle("textFormat", defTextFormat);
 			ui.taOutput.setStyle("disabledTextFormat", defTextFormat);
 			ui.btnStart.setStyle("textFormat", btnTextFormat);
@@ -160,6 +167,8 @@ package
 			btnCantonMode1.addEventListener("click", onModeButtonClick);
 			btnCantonMode2 = new ModeButton(ui.btnCantonMode2, PRCMODE_CANTON_WH_2);
 			btnCantonMode2.addEventListener("click", onModeButtonClick);
+			btnShenzhen = new ModeButton(ui.btnShzMode, PRCMODE_SHENZHEN);
+			btnShenzhen.addEventListener("click", onModeButtonClick);
 			
 			function onModeButtonClick(e:Event):void 
 			{
@@ -173,6 +182,8 @@ package
 			xmlFile = new File();
 			xlFile.addEventListener(Event.SELECT, onFileSelect);
 			xmlFile.addEventListener(Event.SELECT, onFileSelect);
+			
+			xlColLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP", "AQ", "AR", "AS", "AT", "AU", "AV", "AW", "AX", "AY", "AZ"]; 
 			
 			loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
 			
@@ -211,7 +222,6 @@ package
 			{
 				var error:Error = e.error as Error;
 				outputLogLine("Системная ошибка: " + error.message, COLOR_BAD);
-				outputLogLine("Требуется проинформировать об этом создателя", COLOR_BAD);
 			}
 		}
 		
@@ -319,13 +329,13 @@ package
 			
 			if (btn == ui.btnXlDialog)
 			{
-				xlFile.browseForOpen("Файл Excel 2007 с информацией о треках в формате склада Кантона",
+				xlFile.browseForOpen("Файл Excel 2007 с информацией о треках",
 					[new FileFilter("Excel 2007", "*.xlsx")]);
 			}
 			
 			else if (btn == ui.btnXmlDialog)
 			{
-				xmlFile.browseForOpen("Файл data.xml от TrackChecker",
+				xmlFile.browseForOpen("Файл с данными TrackChecker",
 					[new FileFilter("Файл XML", "*.xml")]);
 			}
 		}
@@ -395,6 +405,10 @@ package
 				case PRCMODE_CANTON_WH_2:
 					modeBtn = btnCantonMode2;
 					break;
+				
+				case PRCMODE_SHENZHEN:
+					modeBtn = btnShenzhen;
+					break;
 					
 				default:
 					throw new Error("Out of possible modes");
@@ -414,7 +428,7 @@ package
 		{
 			if (xmlFilePathError)
 			{
-				outputLogLine("Ошибка в пути к файлу data.xml. Запуск невозможен.", COLOR_BAD);
+				outputLogLine("Ошибка в пути к файлу с данными TrackChecker. Запуск невозможен.", COLOR_BAD);
 				return;
 			}
 			
@@ -432,7 +446,7 @@ package
 			fst.addEventListener(ProgressEvent.PROGRESS, onXMLFileLoadingProgress);
 			fst.addEventListener(Event.COMPLETE, onXMLFileLoadingDone);
 			fst.openAsync(xmlFile, FileMode.READ);
-			outputLogLine("Загрузка файла data.xml от TrackChecker");
+			outputLogLine("Загрузка файла c данными TrackChecker");
 		}
 		
 		private function onXMLFileLoadingProgress(e:ProgressEvent):void
@@ -461,14 +475,12 @@ package
 			
 			if (dataXml.@maxid == "" || dataXml.@maxid == null)
 			{
-				outputLogLine("Неверный формат \"data.xml\"", COLOR_BAD);
+				outputLogLine("Неверный формат файла с данными. Запуск отменён", COLOR_BAD);
 				return;
 			}
 			
 			maxID = maxIDDefault = uint(dataXml.@maxid);
 			trace("MAX ID:", dataXml.@maxid);
-			
-			outputLogLine("Имеющиеся группы в корне: " + String(rootNodesCount));
 			
 			// Capture current date to use it in XML output
 			currentDate = printDate();
@@ -481,10 +493,12 @@ package
 					processFrontwinnerMode();
 					break;
 					
-				// Canton warehouse modes 1 and 2 (one processing function)
+				// "Excel modes"
+				// Canton 1 / 2, Shenzhen (SEO & CFF)
 				case PRCMODE_CANTON_WH_1:
 				case PRCMODE_CANTON_WH_2:
-					startLoadingCantonExcelFile();
+				case PRCMODE_SHENZHEN:
+					startLoadingExcelFile();
 					break;
 					
 				default:
@@ -493,7 +507,7 @@ package
 			}
 		}
 		
-		private function startLoadingCantonExcelFile():void
+		private function startLoadingExcelFile():void
 		{
 			// Excel file check
 			if (xlFilePathError)
@@ -502,32 +516,53 @@ package
 				return;
 			}
 			
-			// Load excel file (Canton warehouse format)
+			// Load excel file
 			xlLoader = new XLSXLoader();
-			xlLoader.addEventListener(Event.COMPLETE, processCantonExcelModes1and2);
+			xlLoader.addEventListener(Event.COMPLETE, excelFileLoadingDone);
 			xlLoader.load(ui.tfXlFile.text);
-			
-			outputLogLine(
-				"Загрузка файла Excel в формате склада Кантона. Формат #" +
-				(prcMode == PRCMODE_CANTON_WH_1 ? "1" : "2"), 
-				COLOR_SPECIAL
-			);
+			outputLogLine("Загрузка файла Excel");
 		}
 		
-		private function processCantonExcelModes1and2(e:Event):void
+		private function excelFileLoadingDone(e:Event):void 
 		{
-			xlLoader.removeEventListener(Event.COMPLETE, processCantonExcelModes1and2);
+			xlLoader.removeEventListener(Event.COMPLETE, excelFileLoadingDone);
 			xlSheet = xlLoader.worksheet("Sheet1");
 			
+			// Mode fork (for excel modes)
+			switch (prcMode) 
+			{
+				case PRCMODE_CANTON_WH_1:
+				case PRCMODE_CANTON_WH_2:
+				{
+					processCantonExcelModes1and2();
+					break;
+				}
+				
+				case PRCMODE_SHENZHEN:
+				{
+					processShenzhenMode();
+					break;
+				}
+				
+				default:
+					throw new Error("Out of possible Excel modes");
+					break;
+			}
+		}
+		
+		private function processCantonExcelModes1and2():void
+		{
 			if (xlSheet.getCellValue("A1").search(/Parcel List/i) == -1)
 			{
-				outputLogLine("Неверный формат Excel", COLOR_BAD);
+				outputLogLine("Неверный формат таблицы для режима «Кантон»", COLOR_BAD);
 				return;
 			}
 			
 			// Local shortcuts for Canton modes
 			var md1:Boolean = (prcMode == PRCMODE_CANTON_WH_1);
 			var md2:Boolean = (prcMode == PRCMODE_CANTON_WH_2);
+			
+			outputLogLine("Чтение таблицы в формате Кантона", COLOR_SPECIAL);
 			
 			/**
 			 * Parsing Canton Excel Format
@@ -698,8 +733,6 @@ package
 				}
 				
 				track = trimSpaces(trackColVal);
-				//name = trimSpaces(nameColVal);
-				//country = trimSpaces(cntColVal);
 				
 				// [!] Special date for Mode 2
 				var xmlTrack:XML = createXmlTrack(name, track, country, (md2 && tableDate != null) ? tableDate : null);
@@ -1085,6 +1118,322 @@ package
 			writeBackToXMLFile();
 		}
 		
+		private function processShenzhenMode():void 
+		{
+			/*
+			Алгоритм
+			> Validation checks
+			> Determine columns
+			> Parse excel
+			> Fill XML
+			> Show stats
+			> Write to output file
+			> Write XML back to file
+			*/
+			
+			/**
+			 * General validation
+			 * ================================================================================
+			 */
+			
+			if (xlSheet.cols <= 1) 
+			{
+				outputLogLine("Неверный формат таблицы для режима «Шэньчжэнь»", COLOR_BAD);
+				return;
+			}
+			
+			// User defined date
+			var userDefinedDateStr:String = trimSpaces(ui.tfUserDate.text);
+			const userDefinedDatePattern:RegExp = /^(0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[012])\.(\d{4})$/;
+			
+			if (userDefinedDateStr == "") 
+			{
+				userDefinedDate = null;
+				outputLogLine("Дата для события 'Added' не указана", COLOR_BAD);
+				return;
+			}
+			
+			else if (userDefinedDateStr.search(userDefinedDatePattern) == -1) 
+			{
+				userDefinedDate = null;
+				outputLogLine("Указан неверный формат даты. Должен быть: DD.MM.YYYY", COLOR_BAD);
+				return;
+			}
+			
+			else 
+			{
+				var reAr:Array = userDefinedDateStr.match(userDefinedDatePattern);
+				userDefinedDate = new Date(int(reAr[3]), int(reAr[2]) - 1, int(reAr[1]));
+			}
+			
+			// ================================================================================
+			
+			var i:int;
+			
+			outputLogLine("Чтение таблицы в формате Шэньчжэня", COLOR_SPECIAL);
+			
+			/**
+			 * Determine columns
+			 * ================================================================================
+			 */
+			
+			const tableHeaderRow:int = 1;
+			const trackColHeaderPattern:RegExp = /^Tracking no/i;
+			const nameColHeaderPattern:RegExp = /^Buyer Fullname/i;
+			const countryColHeaderPattern:RegExp = /^Buyer Country/i;
+			const skuColHeaderPattern:RegExp = /^SKU/i;
+			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
+			
+			var trackCol:String;
+			var nameCol:String;
+			var countryCol:String;
+			var skuCol:String;
+			var weightCol:String;
+			
+			if (xlSheet.cols > xlColLetters.length) 
+			{
+				outputLogLine("Количество колонок в таблице выходит за пределы разумного", COLOR_BAD);
+				return;
+			}
+			
+			var headerCellVal:String;
+			var len:int = xlSheet.cols;
+			for (i = 0; i < len; i++) 
+			{	
+				headerCellVal = trimSpaces(xlSheet.getCellValue(xlColLetters[i] + tableHeaderRow));
+				
+				// Track col header
+				if (trackCol == null && headerCellVal.search(trackColHeaderPattern) != -1)
+				{
+					trackCol = xlColLetters[i];
+				}
+				
+				// Name col header
+				if (nameCol == null && headerCellVal.search(nameColHeaderPattern) != -1) 
+				{
+					nameCol = xlColLetters[i];
+				}
+				
+				// Country col header
+				if (countryCol == null && headerCellVal.search(countryColHeaderPattern) != -1) 
+				{
+					countryCol = xlColLetters[i];
+				}
+				
+				// SKU col header
+				if (skuCol == null && headerCellVal.search(skuColHeaderPattern) != -1) 
+				{
+					skuCol = xlColLetters[i];
+				}
+				
+				// Weight col header
+				if (weightCol == null && headerCellVal.search(weightColHeaderPattern) != -1) 
+				{
+					weightCol = xlColLetters[i];
+				}
+				
+				// Final check
+				if (trackCol != null && nameCol != null && countryCol != null && skuCol != null && weightCol != null) 
+				{
+					// All columns determined
+					break;
+				}
+				else if (i == len-1)
+				{
+					outputLogLine("Не все требуемые колонки определены", COLOR_BAD);
+					return;	
+				}
+			}
+			
+			outputLogLine(
+				"Колонка с треками: " + trackCol +
+				", Имя покупателя: " + nameCol +
+				", Страна: " + countryCol +
+				", SKU: " + skuCol +
+				", Вес посылки: " + weightCol
+			);
+			
+			/**
+			 * Parse table
+			 * ================================================================================
+			 */
+						
+			var row:int;
+			var packages:Vector.<ShenzhenPackage> = new Vector.<ShenzhenPackage>();
+			var currentPackage:ShenzhenPackage;
+			 
+			var trackColVal:String;
+			var nameColVal:String;
+			var countryColVal:String;
+			var skuColVal:String;
+			var weightColVal:String;
+			
+			function initPackage():void
+			{
+				currentPackage = new ShenzhenPackage();
+				
+				currentPackage.track = trackColVal;
+				currentPackage.buyerName = nameColVal;
+				currentPackage.buyerCountry = countryColVal;
+				currentPackage.itemsList = new Vector.<String>();
+				
+				if (skuColVal != null)
+					currentPackage.itemsList.push(skuColVal);
+				else
+					outputLogLine("Пустой SKU на строке " + row, COLOR_WARN);
+				
+				if (weightColVal != null)
+					currentPackage.weight = weightColVal;
+				else
+					outputLogLine("Пустой вес на строке " + row, COLOR_WARN);
+			}
+			
+			function finishPackage():void 
+			{
+				packages.push(currentPackage);
+				currentPackage = null;
+				tracksCount++;
+			}
+			
+			// Reset stats
+			tracksCount = existingTracksCount = 0;
+			
+			row = 1;
+			
+			while (true) 
+			{
+				row++;
+				trackColVal = trimSpaces(xlSheet.getCellValue(trackCol + row));
+				nameColVal = trimSpaces(xlSheet.getCellValue(nameCol + row));
+				countryColVal = trimSpaces(xlSheet.getCellValue(countryCol + row));
+				skuColVal = trimSpaces(xlSheet.getCellValue(skuCol + row));
+				weightColVal = trimSpaces(xlSheet.getCellValue(weightCol + row));
+				
+				// Determine line type
+				// · Header line
+				if (trackColVal != "" && nameColVal != "" && countryColVal != "") 
+				{
+					if (currentPackage != null)
+						finishPackage();
+						
+					initPackage();
+					continue;
+				}
+				
+				// · Secondary valid line
+				else if (skuColVal != "" && trackColVal == "" && nameColVal == "" && countryColVal == "") 
+				{
+					if (currentPackage != null)
+					{
+						currentPackage.itemsList.push(skuColVal);
+						continue;
+					}
+					else 
+					{
+						outputLogLine("Осиротевшая строка " + row + " проигнорирована", COLOR_WARN);
+						continue;
+					}
+				}
+				
+				// · Invalid line
+				else 
+				{
+					// Empty line
+					if (trackColVal == "" && nameColVal == "" && countryColVal == "" && skuColVal == "" && weightColVal == "") 
+					{
+						if (currentPackage != null)	
+							finishPackage();
+						
+						if (row >= xlSheet.rows)
+							// Finish parsing
+							break;
+					}
+					
+					outputLogLine("Проблема со строкой " + row + ". Она проигнорирована", COLOR_WARN);
+					continue;
+				}
+			}
+			
+			trace("Parsing done");
+			
+			/**
+			 * Fill XML
+			 * ================================================================================
+			 */
+			
+			var rootGroup:XML = dataXml.groups.(@id == 0)[0];
+			var xmlQuery:XMLList;
+			var seoFolder:XML;
+			var pkg:ShenzhenPackage;
+			var commentWithSkuList:String = null;
+			
+			userDefinedDateStr = userDefinedDate != null ? printDate(true, userDefinedDate) : currentDate;
+			
+			xmlQuery = rootGroup.groups.(@desc == "SEO");
+			if (xmlQuery.length() > 0) 
+			{
+				seoFolder = xmlQuery[0];
+			}
+			else 
+			{
+				seoFolder = createXmlGroup("SEO");
+				rootGroup.prependChild(seoFolder);
+			}
+			
+			for each (pkg in packages) 
+			{
+				xmlQuery = dataXml..track.(@desc == pkg.buyerName && @track == pkg.track);
+				if (xmlQuery.length() > 0) 
+				{
+					main.logRed("Track Duplicate Found: " + pkg.buyerName + " " + pkg.track);
+					existingTracksCount++;
+					continue;
+				}
+				
+				commentWithSkuList = pkg.itemsList.length > 0 ? pkg.itemsList.join("\n") : null;
+				
+				seoFolder.appendChild(
+					createXmlTrack(pkg.buyerName, pkg.track, pkg.buyerCountry, userDefinedDateStr, commentWithSkuList)
+				);
+			}
+			
+			trace("Filling done");
+			
+			// Write result of script work to output.xml
+			var output:XML = <track-script-output/>;
+			output.appendChild(seoFolder);
+			output.@date = getFormattedDate("dd.MM.yyyy HH:mm:ss");
+			output.@version = main.version;
+			output.@format = "Shenzhen";
+			output.@excel = ui.tfXlFile.text;
+			writeToOutputFile(output);
+			
+			/**
+			 * Show Stats
+			 * ================================================================================
+			 */
+			outputLogLine("Обработано посылок: " + tracksCount);
+			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
+			
+			if (tracksCount == existingTracksCount && tracksCount > 0)
+			{
+				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				return;
+			}
+			
+			if (Capabilities.isDebugger || devFlag)
+			{
+				outputLogLine("Готово", COLOR_SUCCESS);
+				return;
+			}
+			
+			/**
+			 * Write Back to XML File
+			 * ================================================================================
+			 */
+			writeBackToXMLFile();
+		}
+		
 		private function writeBackToXMLFile():void 
 		{
 			// Backup untouched dataXml file before update it
@@ -1162,7 +1511,8 @@ package
 			fst.close();
 		}
 		
-		private function createXmlTrack(name:String, track:String, country:String, addedEventSpecialDate:String = null):XML
+		private function createXmlTrack(name:String, track:String, country:String,
+			addedEventSpecialDate:String = null, comment:String = null):XML
 		{
 			var xmlTrack:XML = <track/>;
 			var xmlTrackServs:XML = <servs/>;
@@ -1172,6 +1522,9 @@ package
 			xmlTrack.@desc = name;
 			xmlTrack.@crdt = currentDate;
 			xmlTrack.@track = track;
+			
+			if (comment != null)
+				xmlTrack.@comm = comment;
 			
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
@@ -1224,6 +1577,16 @@ package
 			g.@desc = grpName;
 			g.@crdt = currentDate;
 			return g;
+		}
+		
+		private function searchExcelColumnByHeader(xlSheet:Worksheet, headerPattern:RegExp, headerRow:int, maxColumn:String):String 
+		{
+			return "";
+		}
+		
+		private function searchExcelColumnByValue(xlSheet:Worksheet, valuePattern:RegExp, maxColumn:String):String 
+		{
+			return "";
 		}
 		
 		private function parseAddressCell(adrCellVal:String):Object
@@ -1366,9 +1729,9 @@ package
 			return srvs;
 		}
 		
-		private function printDate(noTime:Boolean = false):String
+		private function printDate(noTime:Boolean = false, customDate:Date = null):String
 		{
-			var d:Date = new Date();
+			var d:Date = customDate != null ? customDate : new Date();
 			var dtf:DateTimeFormatter = new DateTimeFormatter("ru-RU");
 			var dstr:String;
 			
