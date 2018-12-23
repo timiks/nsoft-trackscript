@@ -145,12 +145,23 @@ package
 			ui.tfXlFile.setStyle("disabledTextFormat", tfTextFormat);
 			ui.tfXmlFile.setStyle("textFormat", tfTextFormat);
 			ui.tfXmlFile.setStyle("disabledTextFormat", tfTextFormat);
-			ui.tfUserDate.setStyle("textFormat", tfTextFormat);
-			ui.tfUserDate.setStyle("disabledTextFormat", tfTextFormat);
 			ui.taOutput.setStyle("textFormat", defTextFormat);
 			ui.taOutput.setStyle("disabledTextFormat", defTextFormat);
 			ui.btnStart.setStyle("textFormat", btnTextFormat);
 			ui.btnStart.setStyle("disabledTextFormat", btnTextFormat);
+			
+			ui.nsDateDay.setStyle("textFormat", tfTextFormat);
+			ui.nsDateDay.setStyle("disabledTextFormat", tfTextFormat);
+			ui.nsDateDay.textField.setStyle("textFormat", tfTextFormat);
+			ui.nsDateDay.textField.setStyle("disabledTextFormat", tfTextFormat);
+			ui.nsDateMonth.setStyle("textFormat", tfTextFormat);
+			ui.nsDateMonth.setStyle("disabledTextFormat", tfTextFormat);
+			ui.nsDateMonth.textField.setStyle("textFormat", tfTextFormat);
+			ui.nsDateMonth.textField.setStyle("disabledTextFormat", tfTextFormat);
+			ui.nsDateYear.setStyle("textFormat", tfTextFormat);
+			ui.nsDateYear.setStyle("disabledTextFormat", tfTextFormat);
+			ui.nsDateYear.textField.setStyle("textFormat", tfTextFormat);
+			ui.nsDateYear.textField.setStyle("disabledTextFormat", tfTextFormat);
 			
 			ui.tfXlFile.text = main.settings.getKey(Settings.sourceExcelFile);
 			ui.tfXmlFile.text = main.settings.getKey(Settings.trackCheckerDataFile);
@@ -190,6 +201,12 @@ package
 			xlColLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP", "AQ", "AR", "AS", "AT", "AU", "AV", "AW", "AX", "AY", "AZ"]; 
 			
 			loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
+			
+			// Date input init
+			var d:Date = new Date(); // Current date
+			ui.nsDateDay.textField.text = d.getDate().toString();
+			ui.nsDateMonth.textField.text = String(d.getMonth() + 1);
+			ui.nsDateYear.textField.text = String(d.getFullYear());
 			
 			// Check services file
 			var srvsFile:File = File.applicationStorageDirectory.resolvePath("services.txt");
@@ -1168,20 +1185,24 @@ package
 			}
 			
 			// User defined date
-			var userDefinedDateStr:String = trimSpaces(ui.tfUserDate.text);
+			var userDefinedDateStr:String = 
+				trimSpaces(ui.nsDateDay.textField.text) + "." + 
+				trimSpaces(ui.nsDateMonth.textField.text) + "." +
+				trimSpaces(ui.nsDateYear.textField.text);
+				
 			const userDefinedDatePattern:RegExp = /^(0?[1-9]|[12][0-9]|3[01])\.(0?[1-9]|1[012])\.(\d{4})$/;
 			
 			if (userDefinedDateStr == "") 
 			{
 				userDefinedDate = null;
-				outputLogLine("Дата для события 'Added' не указана", COLOR_BAD);
+				outputLogLine("Дата для события «Added» не указана", COLOR_BAD);
 				return;
 			}
 			
 			else if (userDefinedDateStr.search(userDefinedDatePattern) == -1) 
 			{
 				userDefinedDate = null;
-				outputLogLine("Указан неверный формат даты. Должен быть: DD.MM.YYYY", COLOR_BAD);
+				outputLogLine("Указана неправильная дата", COLOR_BAD);
 				return;
 			}
 			
@@ -1189,6 +1210,7 @@ package
 			{
 				var reAr:Array = userDefinedDateStr.match(userDefinedDatePattern);
 				userDefinedDate = new Date(int(reAr[3]), int(reAr[2]) - 1, int(reAr[1]));
+				outputLogLine("Дата для события «Added»: " + userDefinedDateStr, COLOR_SPECIAL);
 			}
 			
 			// ================================================================================
