@@ -779,7 +779,7 @@ package
 				trace("TScript Group:", tscriptGrp.@desc);
 				
 				// Check if this group already exists
-				var tcheckerExistingGroups:XMLList = rootGroup..groups.(@desc == tscriptGrp.@desc);
+				var tcheckerExistingGroups:XMLList = rootGroup..groups.(trimSpaces(@desc) == tscriptGrp.@desc);
 				
 				// If exists
 				if (tcheckerExistingGroups.length() > 0)
@@ -795,7 +795,9 @@ package
 						// One operation on possible multiple dupes of our group
 						for each (tcheckerExistingGroup in tcheckerExistingGroups)
 						{
-							var tcheckerExistingGroupTrackDups:XMLList = tcheckerExistingGroup.track.(@track == tscriptGrpTrack.@track);
+							var tcheckerExistingGroupTrackDups:XMLList = 
+								tcheckerExistingGroup.track.(trimSpaces(@track) == tscriptGrpTrack.@track);
+								
 							if (tcheckerExistingGroupTrackDups.length() > 0)
 							{
 								main.logRed("Track Duplicate Found: " + tscriptGrpTrack.@desc + " " + tscriptGrpTrack.@track);
@@ -1072,17 +1074,19 @@ package
 			
 			var rootGroup:XMLList = dataXml.groups.(@id == 0);
 			
-			var x:*;
-			var frontwinnerGrp:* = rootGroup..groups.(@desc == "Frontwinner");
-			if (frontwinnerGrp.length() > 0)
+			var xmlQuery:XMLList;
+			var frontwinnerGrp:XML;
+			xmlQuery = rootGroup..groups.(trimSpaces(@desc).toLowerCase() == "Frontwinner".toLowerCase());
+			if (xmlQuery.length() > 0)
 			{
+				frontwinnerGrp = xmlQuery[0];
 				var newTracks:XMLList = newFrontwinnerGrp.track;
 				for each (var t:XML in newTracks)
 				{
 					// Track Existence Check
 					// If found duplicate > skip this track
-					x = frontwinnerGrp.track.(@desc == t.@desc && @track == t.@track);
-					if (x.length() > 0)
+					xmlQuery = frontwinnerGrp.track.(trimSpaces(@desc) == t.@desc && trimSpaces(@track) == t.@track);
+					if (xmlQuery.length() > 0)
 					{
 						main.logRed("Track Duplicate Found: " + t.@desc + " " + t.@track);
 						existingTracksCount++;
@@ -1400,7 +1404,7 @@ package
 			
 			for each (pkg in packages) 
 			{
-				xmlQuery = dataXml..track.(@desc == pkg.buyerName && @track == pkg.track);
+				xmlQuery = dataXml..track.(trimSpaces(@desc) == pkg.buyerName && trimSpaces(@track) == pkg.track);
 				if (xmlQuery.length() > 0) 
 				{
 					main.logRed("Track Duplicate Found: " + pkg.buyerName + " " + pkg.track);
