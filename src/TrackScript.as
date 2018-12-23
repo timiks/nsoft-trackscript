@@ -41,6 +41,8 @@ package
 		private var ui:UI;
 		private var win:NativeWindow;
 		
+		private const WEIGHT_STAT_MAX_RECORD_COUNT:int = 10;
+		
 		private const undoDirName:String = "undo";
 		private const UNDO_NUMBER:int = 4;
 		private var undoDir:File;
@@ -75,6 +77,8 @@ package
 		private var xmlFile:File;
 		private var dataXml:XML;
 		private var xmlString:String;
+		private var weightStatXml:XML;
+		private var weightStatFile:File;
 		
 		private var maxIDDefault:uint;
 		private var maxID:uint;
@@ -204,6 +208,20 @@ package
 			fst.close();
 			
 			srvsObj = parseServicesFile(srvsFileString);
+			
+			// Weight stat
+			weightStatFile = File.applicationStorageDirectory.resolvePath("weight-stat.xml");
+			if (!weightStatFile.exists || weightStatFile.size == 0) 
+			{
+				XML.prettyPrinting = true;
+				XML.prettyIndent = 4;
+				var defWeightStatXml:XML = <weight-stat/>;
+				
+				fst = new FileStream();
+				fst.open(weightStatFile, FileMode.WRITE);
+				fst.writeUTFBytes(defWeightStatXml.toXMLString());
+				fst.close();
+			}
 			
 			// Resolve Undo dir
 			undoDir = File.applicationStorageDirectory.resolvePath(undoDirName);
@@ -1181,7 +1199,7 @@ package
 			const trackColHeaderPattern:RegExp = /^Tracking no/i;
 			const nameColHeaderPattern:RegExp = /^Buyer Fullname/i;
 			const countryColHeaderPattern:RegExp = /^Buyer Country/i;
-			const skuColHeaderPattern:RegExp = /^SKU/i;
+			const skuColHeaderPattern:RegExp = /^(SKU|Custom Label)/i;
 			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
 			
 			var trackCol:String;
@@ -1408,18 +1426,84 @@ package
 			output.@excel = ui.tfXlFile.text;
 			writeToOutputFile(output);
 			
+			// Local stats
+			var weightStatProducts:uint = 0;
+			
+			if (tracksCount == existingTracksCount && tracksCount > 0)
+			{
+				outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
+				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				return;
+			}
+			
+			/**
+			 * Weight stat
+			 * ================================================================================
+			 */
+			
+			fst = new FileStream();
+			fst.open(weightStatFile, FileMode.READ);
+			var weightStatXmlStr:String = fst.readUTFBytes(fst.bytesAvailable);
+			fst.close();
+			
+			if (weightStatXmlStr.length > 0) 
+			{
+				weightStatXml = new XML(weightStatXmlStr);
+				
+				var p:XML; // Shortcut for product record in weight stat XML
+				var w:XML;
+				for each (pkg in packages) 
+				{
+					if (pkg.itemsList.length == 1 && pkg.weight != null && pkg.weight != "") 
+					{
+						xmlQuery = weightStatXml.p.(@sku == pkg.itemsList[0]);
+						if (xmlQuery.length() > 0) 
+						{
+							p = xmlQuery[0];
+							if (p.children().length() >= WEIGHT_STAT_MAX_RECORD_COUNT) 
+							{
+								w = <w/>;
+								w.@v = pkg.weight;
+								p.appendChild(w);
+								delete p.children()[0];
+							}
+							else 
+							{
+								w = <w/>;
+								w.@v = pkg.weight;
+								p.appendChild(w);
+							}
+						}
+						else 
+						{
+							p = <p/>;
+							p.@sku = pkg.itemsList[0];
+							w = <w/>;
+							w.@v = pkg.weight;
+							p.appendChild(w);
+							weightStatXml.appendChild(p);
+						}
+						
+						weightStatProducts++;
+					}
+				}
+				
+				XML.prettyPrinting = true;
+				XML.prettyIndent = 4;
+				
+				fst = new FileStream();
+				fst.open(weightStatFile, FileMode.WRITE);
+				fst.writeUTFBytes(weightStatXml.toXMLString());
+				fst.close();
+			}
+			
 			/**
 			 * Show Stats
 			 * ================================================================================
 			 */
 			outputLogLine("Обработано посылок: " + tracksCount);
 			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
-			
-			if (tracksCount == existingTracksCount && tracksCount > 0)
-			{
-				outputLogLine("Одинаковый прогон", COLOR_BAD);
-				return;
-			}
+			if (weightStatProducts > 0) outputLogLine("Посылки с одним товаром для сбора статистики веса: " + weightStatProducts);
 			
 			if (Capabilities.isDebugger || devFlag)
 			{
