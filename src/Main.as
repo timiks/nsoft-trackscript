@@ -14,10 +14,10 @@ package
 		private static var $ins:Main;
 		
 		// Version
-		private const $version:int 				= 7;
-		private const $versionService:int 		= 4;
-		private const $betaVersion:Boolean 		= false;
-		private const $betaVersionNumber:int 	= 0;
+		private const $version:int 				= 8;
+		private const $versionService:int 		= 0;
+		private const $betaVersion:Boolean 		= true;
+		private const $betaVersionNumber:int 	= 1;
 		private const bugs:Boolean 				= false;
 		
 		// Functional Members
