@@ -48,7 +48,7 @@ package
 		private var undoDir:File;
 		
 		private var btnFWMode:ModeButton;
-		private var btnCantonMode1:ModeButton;
+		//private var btnCantonMode1:ModeButton;
 		private var btnCantonMode2:ModeButton;
 		private var btnShenzhen:ModeButton;
 		
@@ -58,7 +58,7 @@ package
 		private const COLOR_SPECIAL:String = "#0075BF"; // Blue
 		
 		private const PRCMODE_FRONTWINNER:int = 1;
-		private const PRCMODE_CANTON_WH_1:int = 2;
+		private const PRCMODE_CANTON_WH_1:int = 2; // Not in use
 		private const PRCMODE_CANTON_WH_2:int = 3;
 		private const PRCMODE_SHENZHEN:int = 4;
 		
@@ -167,8 +167,8 @@ package
 			// Mode buttons
 			btnFWMode = new ModeButton(ui.btnFWMode, PRCMODE_FRONTWINNER);
 			btnFWMode.addEventListener("click", onModeButtonClick);
-			btnCantonMode1 = new ModeButton(ui.btnCantonMode1, PRCMODE_CANTON_WH_1);
-			btnCantonMode1.addEventListener("click", onModeButtonClick);
+			//btnCantonMode1 = new ModeButton(ui.btnCantonMode1, PRCMODE_CANTON_WH_1);
+			//btnCantonMode1.addEventListener("click", onModeButtonClick);
 			btnCantonMode2 = new ModeButton(ui.btnCantonMode2, PRCMODE_CANTON_WH_2);
 			btnCantonMode2.addEventListener("click", onModeButtonClick);
 			btnShenzhen = new ModeButton(ui.btnShzMode, PRCMODE_SHENZHEN);
@@ -415,10 +415,12 @@ package
 				case PRCMODE_FRONTWINNER:
 					modeBtn = btnFWMode;
 					break;
-					
+				
+				/*	
 				case PRCMODE_CANTON_WH_1:
 					modeBtn = btnCantonMode1;
 					break;
+				*/	
 					
 				case PRCMODE_CANTON_WH_2:
 					modeBtn = btnCantonMode2;
@@ -429,8 +431,9 @@ package
 					break;
 					
 				default:
-					throw new Error("Out of possible modes");
-					return;
+					main.logRed("Warning! Out of possible modes");
+					modeValue = PRCMODE_FRONTWINNER; // Set default
+					modeBtn = btnFWMode;
 					break;
 			}
 			
@@ -513,7 +516,7 @@ package
 					
 				// "Excel modes"
 				// Canton 1 / 2, Shenzhen (SEO & CFF)
-				case PRCMODE_CANTON_WH_1:
+				//case PRCMODE_CANTON_WH_1:
 				case PRCMODE_CANTON_WH_2:
 				case PRCMODE_SHENZHEN:
 					startLoadingExcelFile();
@@ -549,7 +552,7 @@ package
 			// Mode fork (for excel modes)
 			switch (prcMode) 
 			{
-				case PRCMODE_CANTON_WH_1:
+				//case PRCMODE_CANTON_WH_1:
 				case PRCMODE_CANTON_WH_2:
 				{
 					processCantonExcelModes1and2();
