@@ -456,6 +456,7 @@ package
 			
 			prcMode = modeValue;
 			main.settings.setKey(Settings.prcMode, prcMode);
+			
 			if (currentPrcModeButton != null)
 				currentPrcModeButton.active = false;
 			currentPrcModeButton = modeBtn;
@@ -1655,7 +1656,17 @@ package
 				xmlTrackServs.appendChild(xmlServ);
 			}
 			
-			var specialServs:Array = getCntServices(country);
+			var specialServs:Array;
+			
+			// #SPECIAL-CASE: UK service in Shenzhen mode
+			if (prcMode == PRCMODE_SHENZHEN && country.search(/United Kingdom/i) != -1) 
+			{
+				specialServs = ["uk_yodel"];
+			}
+			
+			// Regular behavior: take special services based on country from user file
+			if (specialServs == null)
+				specialServs = getCntServices(country);
 			
 			if (specialServs != null)
 			{
