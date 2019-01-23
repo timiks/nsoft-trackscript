@@ -19,6 +19,7 @@ package {
 		public function Settings():void {}
 
 		public static const sourceExcelFile:String = "sourceExcelFile";
+		public static const excelDir:String = "excelDir";
 		public static const trackCheckerDataFile:String = "trackCheckerDataFile";
 		public static const winPos:String = "winPos";
 		public static const prcMode:String = "prcMode";
@@ -42,6 +43,7 @@ package {
 			allSets = {}; 							// Name / Data type / Default value / Version introduced in
 			allSets[sourceExcelFile] 				= new Setting(sourceExcelFile, String, "", "1.0");
 			allSets[trackCheckerDataFile] 			= new Setting(trackCheckerDataFile, String, "", "1.0");
+			allSets[excelDir]						= new Setting(excelDir, String, "", "9.0");
 			allSets[winPos]							= new Setting(winPos, String, "374:163", "1.0");
 			allSets[prcMode]						= new Setting(prcMode, int, 1, "6.0");
 

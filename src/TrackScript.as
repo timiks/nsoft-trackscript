@@ -65,6 +65,7 @@ package
 		private var prcMode:int;
 		private var currentPrcModeButton:ModeButton;
 		private var xlFilePathError:Boolean = false;
+		private var xlDirPathError:Boolean = false;
 		private var xmlFilePathError:Boolean = false;
 		private var devFlag:Boolean = false;
 		private var runsCount:int;
@@ -74,6 +75,7 @@ package
 		private var xlSheet:Worksheet;
 		private var xlColLetters:Array;
 		private var xlFile:File;
+		private var xlDir:File;
 		private var xmlFile:File;
 		private var dataXml:XML;
 		private var xmlString:String;
@@ -143,6 +145,8 @@ package
 			
 			ui.tfXlFile.setStyle("textFormat", tfTextFormat);
 			ui.tfXlFile.setStyle("disabledTextFormat", tfTextFormat);
+			ui.tfXlDir.setStyle("textFormat", tfTextFormat);
+			ui.tfXlDir.setStyle("disabledTextFormat", tfTextFormat);
 			ui.tfXmlFile.setStyle("textFormat", tfTextFormat);
 			ui.tfXmlFile.setStyle("disabledTextFormat", tfTextFormat);
 			ui.taOutput.setStyle("textFormat", defTextFormat);
@@ -164,14 +168,17 @@ package
 			ui.nsDateYear.textField.setStyle("disabledTextFormat", tfTextFormat);
 			
 			ui.tfXlFile.text = main.settings.getKey(Settings.sourceExcelFile);
+			ui.tfXlDir.text = main.settings.getKey(Settings.excelDir);
 			ui.tfXmlFile.text = main.settings.getKey(Settings.trackCheckerDataFile);
 			ui.tfXlFile.addEventListener("change", onTfChange);
+			ui.tfXlDir.addEventListener("change", onTfChange);
 			ui.tfXmlFile.addEventListener("change", onTfChange);
 			
 			ui.taOutput.editable = false;
 			
 			ui.btnXlDialog.addEventListener(MouseEvent.CLICK, btnDialogClick);
 			ui.btnXmlDialog.addEventListener(MouseEvent.CLICK, btnDialogClick);
+			ui.btnXlDirDialog.addEventListener(MouseEvent.CLICK, btnDialogClick);
 			ui.btnStart.addEventListener(MouseEvent.CLICK, btnStartClick);
 			ui.btnStart.label = "З А П У С К";
 			
@@ -193,9 +200,11 @@ package
 			// Init mode
 			switchMode(main.settings.getKey(Settings.prcMode) as int);
 			
-			xlFile = new File();
-			xmlFile = new File();
+			xlFile = new File(ui.tfXlFile.text);
+			xlDir = new File(ui.tfXlDir.text);
+			xmlFile = new File(ui.tfXmlFile.text);
 			xlFile.addEventListener(Event.SELECT, onFileSelect);
+			xlDir.addEventListener(Event.SELECT, onFileSelect);
 			xmlFile.addEventListener(Event.SELECT, onFileSelect);
 			
 			xlColLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP", "AQ", "AR", "AS", "AT", "AU", "AV", "AW", "AX", "AY", "AZ"]; 
@@ -339,6 +348,24 @@ package
 					xmlFilePathError = false;
 				}
 			}
+			
+			else if (tf == ui.tfXlDir) 
+			{
+				xlDir.nativePath = ui.tfXlDir.text;
+				
+				if (!xlDir.exists || !xlDir.isDirectory) 
+				{
+					ui.tfXlDir.htmlText = colorText(COLOR_BAD, ui.tfXlDir.text);
+					xlDirPathError = true;
+					return;
+				}
+				else 
+				{
+					ui.tfXlDir.htmlText = colorText("#000000", ui.tfXlDir.text);
+					xlDirPathError = false;
+					main.settings.setKey(Settings.excelDir, ui.tfXlDir.text);
+				}
+			}
 		}
 		
 		private function onFileSelect(e:Event):void
@@ -356,6 +383,12 @@ package
 				ui.tfXmlFile.text = file.nativePath;
 				ui.tfXmlFile.dispatchEvent(new Event("change"));
 			}
+			
+			else if (file == xlDir) 
+			{
+				ui.tfXlDir.text = file.nativePath;
+				ui.tfXlDir.dispatchEvent(new Event("change"));
+			}
 		}
 		
 		private function btnDialogClick(e:MouseEvent):void
@@ -372,6 +405,11 @@ package
 			{
 				xmlFile.browseForOpen("Файл с данными TrackChecker",
 					[new FileFilter("Файл XML", "*.xml")]);
+			}
+			
+			else if (btn == ui.btnXlDirDialog) 
+			{
+				xlDir.browseForDirectory("Укажите папку с файлами *.xlsx");
 			}
 		}
 		
@@ -548,17 +586,77 @@ package
 		
 		private function startLoadingExcelFile():void
 		{
-			// Excel file check
-			if (xlFilePathError)
+			// Shenzhen mode only [!]
+			if (prcMode == PRCMODE_SHENZHEN) 
 			{
-				outputLogLine("Ошибка в пути к файлу Excel. Запуск невозможен.", COLOR_BAD);
-				return;
+				if (xlDirPathError || !xlDir.exists || !xlDir.isDirectory)
+				{
+					outputLogLine("Ошибка в пути к папке с файлами Excel. Запуск невозможен", COLOR_BAD);
+					return;
+				}
+				
+				var dirContents:Array = xlDir.getDirectoryListing();
+				
+				if (dirContents.length == 0) 
+				{
+					outputLogLine("В указанной папке нет никаких файлов", COLOR_BAD);
+					return;
+				}
+				
+				var f:File;
+				var xlFilesList:Vector.<File> = new Vector.<File>();
+				for each (f in dirContents) 
+				{
+					if (f.nativePath.search(/.xlsx$/) != -1)
+						xlFilesList.push(f);
+				}
+				
+				if (xlFilesList.length == 0) 
+				{
+					outputLogLine("В указанной папке нет XLSX-файлов", COLOR_BAD);
+					return;
+				}
+				
+				var chosenXlFile:File;
+				if (xlFilesList.length == 1) 
+				{
+					chosenXlFile = xlFilesList[0];
+				}
+				else 
+				{
+					var mostRecentFile:File;
+					for each (f in xlFilesList) 
+					{
+						if (mostRecentFile == null)
+							mostRecentFile = f;
+						
+						if (f.modificationDate.getTime() > mostRecentFile.modificationDate.getTime())
+							mostRecentFile = f;
+					}
+					
+					chosenXlFile = mostRecentFile;
+				}
+				
+				outputLogLine("Файл <b>" + chosenXlFile.name + "</b> выбран из указанной папки", COLOR_SPECIAL);
+			}
+			
+			// For rest Excel modes
+			else 
+			{
+				// Excel file check
+				if (xlFilePathError)
+				{
+					outputLogLine("Ошибка в пути к файлу Excel. Запуск невозможен.", COLOR_BAD);
+					return;
+				}
+				
+				chosenXlFile = xlFile;
 			}
 			
 			// Load excel file
 			xlLoader = new XLSXLoader();
 			xlLoader.addEventListener(Event.COMPLETE, excelFileLoadingDone);
-			xlLoader.load(ui.tfXlFile.text);
+			xlLoader.load(chosenXlFile.nativePath);
 			outputLogLine("Загрузка файла Excel");
 		}
 		
