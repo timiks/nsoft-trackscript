@@ -7,7 +7,7 @@
     <movie path="bin\TrackScript.swf" />
     <movie fps="30" />
     <movie width="550" />
-    <movie height="490" />
+    <movie height="600" />
     <movie version="3" />
     <movie minorVersion="7" />
     <movie platform="AIR" />
