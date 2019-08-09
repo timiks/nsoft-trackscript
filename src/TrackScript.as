@@ -101,6 +101,7 @@ package
 		private function init(e:Event = null):void
 		{
 			removeEventListener(Event.ADDED_TO_STAGE, init);
+			loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
 			
 			// Entry Point
 			main = Main.ins;
@@ -200,16 +201,14 @@ package
 			// Init mode
 			switchMode(main.settings.getKey(Settings.prcMode) as int);
 			
-			xlFile = new File(ui.tfXlFile.text);
-			xlDir = new File(ui.tfXlDir.text);
-			xmlFile = new File(ui.tfXmlFile.text);
+			xlFile = new File(ui.tfXlFile.text != "" ? ui.tfXlFile.text : null);
+			xlDir = new File(ui.tfXlDir.text != "" ? ui.tfXlDir.text : null);
+			xmlFile = new File(ui.tfXmlFile.text != "" ? ui.tfXmlFile.text : null);
 			xlFile.addEventListener(Event.SELECT, onFileSelect);
 			xlDir.addEventListener(Event.SELECT, onFileSelect);
 			xmlFile.addEventListener(Event.SELECT, onFileSelect);
 			
 			xlColLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP", "AQ", "AR", "AS", "AT", "AU", "AV", "AW", "AX", "AY", "AZ"]; 
-			
-			loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
 			
 			// Date input init
 			var d:Date = new Date(); // Current date
