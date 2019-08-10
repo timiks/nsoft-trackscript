@@ -1328,12 +1328,14 @@ package
 			const countryColHeaderPattern:RegExp = /^Buyer Country/i;
 			const skuColHeaderPattern:RegExp = /^(SKU|Custom Label)/i;
 			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
+			const packageOrderNumColHeaderPattern:RegExp = /^Order num/i;
 			
 			var trackCol:String;
 			var nameCol:String;
 			var countryCol:String;
 			var skuCol:String;
 			var weightCol:String;
+			var packageOrderNumCol:String;
 			
 			if (xlSheet.cols > xlColLetters.length) 
 			{
@@ -1377,8 +1379,19 @@ package
 					weightCol = xlColLetters[i];
 				}
 				
+				// Order num col header
+				if (packageOrderNumCol == null && headerCellVal.search(packageOrderNumColHeaderPattern) != -1) 
+				{
+					packageOrderNumCol = xlColLetters[i];
+				}
+				
 				// Final check
-				if (trackCol != null && nameCol != null && countryCol != null && skuCol != null && weightCol != null) 
+				if (trackCol != null && 
+					nameCol != null &&
+					countryCol != null &&
+					skuCol != null &&
+					weightCol != null &&
+					packageOrderNumCol != null) 
 				{
 					// All columns determined
 					break;
@@ -1395,7 +1408,8 @@ package
 				", Имя покупателя: " + nameCol +
 				", Страна: " + countryCol +
 				", SKU: " + skuCol +
-				", Вес посылки: " + weightCol
+				", Вес посылки: " + weightCol +
+				", Номер заказа: " + packageOrderNumCol
 			);
 			
 			/**
@@ -1412,6 +1426,7 @@ package
 			var countryColVal:String;
 			var skuColVal:String;
 			var weightColVal:String;
+			var packageOrderNumColVal:String;
 			
 			function initPackage():void
 			{
@@ -1422,15 +1437,23 @@ package
 				currentPackage.buyerCountry = countryColVal;
 				currentPackage.itemsList = new Vector.<String>();
 				
+				// SKU
 				if (skuColVal != null)
 					currentPackage.itemsList.push(skuColVal);
 				else
 					outputLogLine("Пустой SKU на строке " + row, COLOR_WARN);
 				
+				// Weight
 				if (weightColVal != null)
 					currentPackage.weight = weightColVal;
 				else
 					outputLogLine("Пустой вес на строке " + row, COLOR_WARN);
+				
+				// Order num
+				if (packageOrderNumColVal != null)
+					currentPackage.packageOrderNum = packageOrderNumColVal;
+				else
+					outputLogLine("Пустой номер заказа на строке " + row, COLOR_WARN);
 			}
 			
 			function finishPackage():void 
@@ -1453,6 +1476,7 @@ package
 				countryColVal = trimSpaces(xlSheet.getCellValue(countryCol + row));
 				skuColVal = trimSpaces(xlSheet.getCellValue(skuCol + row));
 				weightColVal = trimSpaces(xlSheet.getCellValue(weightCol + row));
+				packageOrderNumColVal = trimSpaces(xlSheet.getCellValue(packageOrderNumCol + row));
 				
 				// Determine line type
 				// · Header line
@@ -1553,13 +1577,10 @@ package
 			output.@excel = ui.tfXlFile.text;
 			writeToOutputFile(output);
 			
-			// Local stats
-			var weightStatProducts:uint = 0;
-			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
 				outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
-				outputLogLine("Одинаковый прогон", COLOR_BAD);
+				outputLogLine("Одинаковый прогон — 100% дублей треков", COLOR_BAD);
 				return;
 			}
 			
@@ -1567,6 +1588,10 @@ package
 			 * Weight stat
 			 * ================================================================================
 			 */
+			
+			// Local stats
+			var weightStatProducts:uint = 0;
+			var skippedWeightStatProducts:uint = 0;
 			
 			fst = new FileStream();
 			fst.open(weightStatFile, FileMode.READ);
@@ -1577,8 +1602,22 @@ package
 			{
 				weightStatXml = new XML(weightStatXmlStr);
 				
-				var p:XML; // Shortcut for product record in weight stat XML
-				var w:XML;
+				var p:XML; // Shortcut for product record (entry) in weight stat XML
+				var w:XML; // Shortcut for weight record (entry)
+				
+				function processWeightEntry(appendOverflow:Boolean = false):void 
+				{
+					// Create new entry
+					w = <w/>;
+					w.@v = pkg.weight;
+					w.@pon = pkg.packageOrderNum;
+					p.appendChild(w);
+					
+					// If maximum entries in the list > also delete the first item in the list
+					if (appendOverflow)
+						delete p.children()[0];
+				}
+				
 				for each (pkg in packages) 
 				{
 					if (pkg.itemsList.length == 1 && pkg.weight != null && pkg.weight != "") 
@@ -1587,27 +1626,31 @@ package
 						if (xmlQuery.length() > 0) 
 						{
 							p = xmlQuery[0];
+							
+							// Check weight entry existence in stat by package order num
+							xmlQuery = p.w.(attribute("pon") == pkg.packageOrderNum);
+							if (xmlQuery.length() > 0) 
+							{
+								// If entry with such order num already exists > skip this package for adding to stat
+								skippedWeightStatProducts++;
+								continue;
+							}
+							
+							// If no entry presence by order num (above) > Add weight entry to product node in stat
 							if (p.children().length() >= WEIGHT_STAT_MAX_RECORD_COUNT) 
 							{
-								w = <w/>;
-								w.@v = pkg.weight;
-								p.appendChild(w);
-								delete p.children()[0];
+								processWeightEntry(true);
 							}
 							else 
 							{
-								w = <w/>;
-								w.@v = pkg.weight;
-								p.appendChild(w);
+								processWeightEntry();
 							}
 						}
 						else 
 						{
 							p = <p/>;
 							p.@sku = pkg.itemsList[0];
-							w = <w/>;
-							w.@v = pkg.weight;
-							p.appendChild(w);
+							processWeightEntry();
 							weightStatXml.appendChild(p);
 						}
 						
@@ -1629,8 +1672,12 @@ package
 			 * ================================================================================
 			 */
 			outputLogLine("Обработано посылок: " + tracksCount);
-			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
-			if (weightStatProducts > 0) outputLogLine("Посылки с одним товаром для сбора статистики веса: " + weightStatProducts);
+			if (existingTracksCount > 0) 
+				outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
+			if (weightStatProducts > 0) 
+				outputLogLine("Учтённые посылки с одним товаром для сбора статистики веса: " + weightStatProducts);
+			if (skippedWeightStatProducts > 0) 
+				outputLogLine("Неучтённые статистикой веса посылки: " + skippedWeightStatProducts, COLOR_WARN);
 			
 			if (Capabilities.isDebugger || devFlag)
 			{
