@@ -1052,7 +1052,7 @@ package
 			var isPrevRecordTrack:Boolean;
 			
 			var headerLineMark:RegExp = /^([\d-]+) ?#/;
-			var dateInHeaderTpl:RegExp = /^([\d-]+)(?= ?#)/;
+			var headerDateAndOrderNumTemplate:RegExp = /^([\d-]+) ?(#\d+)(?= ?\$)/;
 			var trackRecordHeaderMark:RegExp = /Shipped$/i;
 			
 			// Frontwinner format match check
@@ -1138,9 +1138,10 @@ package
 				currentTrackRecord = {};
 				tmpRecordSourceLines = new Vector.<String>();
 				
-				// Retrieve date
-				reAr = l.match(dateInHeaderTpl); // From Header line (it's currently being processed)
-				currentTrackRecord.date = reAr[0];
+				// Retrieve [date] and [order number]
+				reAr = l.match(headerDateAndOrderNumTemplate); // From Header line (it's currently being processed)
+				currentTrackRecord.date = reAr[1]; // Date
+				currentTrackRecord.orderNum = reAr[2]; // Order number with '#'
 				
 				trackRecordsCount++;
 			}
@@ -1187,7 +1188,7 @@ package
 			var rec:Object
 			for each (rec in allTrackRecords) 
 			{
-				newFrontwinnerGrp.appendChild(createXmlTrack(rec.name, rec.track, rec.country, rec.date));
+				newFrontwinnerGrp.appendChild(createXmlTrack(rec.name, rec.track, rec.country, rec.date, null, rec.orderNum));
 			}
 			
 			var rootGroup:XMLList = dataXml.groups.(@id == 0);
@@ -1329,6 +1330,7 @@ package
 			const skuColHeaderPattern:RegExp = /^(SKU|Custom Label)/i;
 			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
 			const packageOrderNumColHeaderPattern:RegExp = /^Order num/i;
+			const totalCostColHeaderPattern:RegExp = /^Total amount/i;
 			
 			var trackCol:String;
 			var nameCol:String;
@@ -1336,6 +1338,7 @@ package
 			var skuCol:String;
 			var weightCol:String;
 			var packageOrderNumCol:String;
+			var totalCostCol:String;
 			
 			if (xlSheet.cols > xlColLetters.length) 
 			{
@@ -1385,13 +1388,20 @@ package
 					packageOrderNumCol = xlColLetters[i];
 				}
 				
+				// Total cost col header
+				if (totalCostCol == null && headerCellVal.search(totalCostColHeaderPattern) != -1) 
+				{
+					totalCostCol = xlColLetters[i];
+				}
+				
 				// Final check
 				if (trackCol != null && 
 					nameCol != null &&
 					countryCol != null &&
 					skuCol != null &&
 					weightCol != null &&
-					packageOrderNumCol != null) 
+					packageOrderNumCol != null &&
+					totalCostCol != null) 
 				{
 					// All columns determined
 					break;
@@ -1409,7 +1419,8 @@ package
 				", Страна: " + countryCol +
 				", SKU: " + skuCol +
 				", Вес посылки: " + weightCol +
-				", Номер заказа: " + packageOrderNumCol
+				", Номер заказа: " + packageOrderNumCol +
+				", Стоимость: " + totalCostCol
 			);
 			
 			/**
@@ -1427,6 +1438,7 @@ package
 			var skuColVal:String;
 			var weightColVal:String;
 			var packageOrderNumColVal:String;
+			var totalCostColVal:String;
 			
 			function initPackage():void
 			{
@@ -1454,6 +1466,12 @@ package
 					currentPackage.packageOrderNum = packageOrderNumColVal;
 				else
 					outputLogLine("Пустой номер заказа на строке " + row, COLOR_WARN);
+					
+				// Total cost
+				if (totalCostColVal != null)
+					currentPackage.totalCost = totalCostColVal;
+				else
+					outputLogLine("Пустая стоимость на строке " + row, COLOR_WARN);
 			}
 			
 			function finishPackage():void 
@@ -1477,6 +1495,7 @@ package
 				skuColVal = trimSpaces(xlSheet.getCellValue(skuCol + row));
 				weightColVal = trimSpaces(xlSheet.getCellValue(weightCol + row));
 				packageOrderNumColVal = trimSpaces(xlSheet.getCellValue(packageOrderNumCol + row));
+				totalCostColVal = trimSpaces(xlSheet.getCellValue(totalCostCol + row));
 				
 				// Determine line type
 				// · Header line
@@ -1562,7 +1581,8 @@ package
 				commentWithSkuList = pkg.itemsList.length > 0 ? pkg.itemsList.join("\n") : null;
 				
 				seoFolder.appendChild(
-					createXmlTrack(pkg.buyerName, pkg.track, pkg.buyerCountry, userDefinedDateStr, commentWithSkuList)
+					createXmlTrack(pkg.buyerName, pkg.track, pkg.buyerCountry, 
+						userDefinedDateStr, commentWithSkuList, pkg.packageOrderNum, pkg.weight, pkg.totalCost)
 				);
 			}
 			
@@ -1769,8 +1789,10 @@ package
 			fst.close();
 		}
 		
-		private function createXmlTrack(name:String, track:String, country:String,
-			addedEventSpecialDate:String = null, comment:String = null):XML
+		private function createXmlTrack(
+			name:String, track:String, country:String,
+			eventSpecialDate:String = null, comment:String = null, orderNum:String = null, 
+			weight:String = null, totalCost:String = null):XML
 		{
 			var xmlTrack:XML = <track/>;
 			var xmlTrackServs:XML = <servs/>;
@@ -1784,6 +1806,10 @@ package
 			if (comment != null)
 				xmlTrack.@comm = comment;
 			
+			// ============
+			// ~ SERVICES ~
+			// ============
+				
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
 			
@@ -1825,14 +1851,59 @@ package
 				}
 			}
 			
-			// Special event "Added". Appended to every track
+			xmlTrack.appendChild(xmlTrackServs);
+			
+			// ==========
+			// ~ EVENTS ~
+			// ==========
+			
+			var eventDateCRDT:String = eventSpecialDate == null ? currentDate : eventSpecialDate + "T00:00:00";
+			var eventDateUDT:String = eventSpecialDate == null ? printDate(true) : eventSpecialDate;
+			
+			// Description events
+			if (prcMode == PRCMODE_FRONTWINNER || prcMode == PRCMODE_SHENZHEN) 
+			{
+				var xmlEventDesc:XML;
+				var i:int; // For loops
+				
+				// 4 iterations = 2 events (Frontwinner) and 4 events (Shenzhen)
+				for (i = 1; i < 4+1; i++) 
+				{	
+					if (i > 2 && prcMode == PRCMODE_FRONTWINNER)
+						continue;
+					
+					xmlEventDesc = <event/>;
+					xmlEventDesc.@id = ++maxID;
+					xmlEventDesc.@crdt = eventDateCRDT
+					
+					if (prcMode == PRCMODE_FRONTWINNER) 
+					{
+						xmlEventDesc.@desc = i == 1 ? "Страна: " + country : (i == 2 ? "Заказ: " + orderNum : "");
+					}
+					else if (prcMode == PRCMODE_SHENZHEN)
+					{
+						if (i == 1) xmlEventDesc.@desc = "Страна: " + country;
+						if (i == 2) xmlEventDesc.@desc = "Заказ: " + orderNum;
+						if (i == 3)
+							xmlEventDesc.@desc = "Вес: " + ((Number(weight) < 1) ? (Number(weight) * 1000).toString() + " г" : weight + " кг");
+						if (i == 4) xmlEventDesc.@desc = "Стоимость: $" + totalCost;
+					}
+					
+					xmlEventDesc.@udt = eventDateUDT
+					xmlEventDesc.@auto = 1;
+					xmlEventDesc.@info = 1;
+					
+					xmlTrack.appendChild(xmlEventDesc);
+				}
+			}
+			
+			// Event "Added". Appended to every track
 			var xmlEventAdded:XML = <event/>;
 			xmlEventAdded.@id = ++maxID;
-			xmlEventAdded.@crdt = addedEventSpecialDate == null ? currentDate : addedEventSpecialDate + "T00:00:00";
+			xmlEventAdded.@crdt = eventDateCRDT
 			xmlEventAdded.@desc = "Added";
-			xmlEventAdded.@udt = addedEventSpecialDate == null ? printDate(true) : addedEventSpecialDate;
+			xmlEventAdded.@udt = eventDateUDT
 			
-			xmlTrack.appendChild(xmlTrackServs);
 			xmlTrack.appendChild(xmlEventAdded);
 			
 			return xmlTrack;

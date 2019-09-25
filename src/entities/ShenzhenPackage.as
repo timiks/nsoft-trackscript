@@ -12,6 +12,7 @@ package entities
 		private var $buyerCountry:String;
 		private var $weight:String;
 		private var $packageOrderNum:String;
+		private var $totalCost:String;
 		private var $itemsList:Vector.<String>;
 		
 		public function ShenzhenPackage():void 
@@ -67,6 +68,16 @@ package entities
 		public function set packageOrderNum(value:String):void 
 		{
 			$packageOrderNum = value;
+		}
+		
+		public function get totalCost():String 
+		{
+			return $totalCost;
+		}
+		
+		public function set totalCost(value:String):void 
+		{
+			$totalCost = value;
 		}
 		
 		public function get itemsList():Vector.<String> 
