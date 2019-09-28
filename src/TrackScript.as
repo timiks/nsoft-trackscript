@@ -1886,7 +1886,7 @@ package
 						if (i == 2) xmlEventDesc.@desc = "Заказ: " + orderNum;
 						if (i == 3)
 							xmlEventDesc.@desc = "Вес: " + ((Number(weight) < 1) ? (Number(weight) * 1000).toString() + " г" : weight + " кг");
-						if (i == 4) xmlEventDesc.@desc = "Стоимость: $" + totalCost;
+						if (i == 4) xmlEventDesc.@desc = "Стоимость: " + Number(totalCost).toString();
 					}
 					
 					xmlEventDesc.@udt = eventDateUDT
