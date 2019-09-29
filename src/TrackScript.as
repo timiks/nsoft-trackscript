@@ -234,19 +234,8 @@ package
 			
 			srvsObj = parseServicesFile(srvsFileString);
 			
-			// Weight stat
-			weightStatFile = File.applicationStorageDirectory.resolvePath("weight-stat.xml");
-			if (!weightStatFile.exists || weightStatFile.size == 0) 
-			{
-				XML.prettyPrinting = true;
-				XML.prettyIndent = 4;
-				var defWeightStatXml:XML = <weight-stat/>;
-				
-				fst = new FileStream();
-				fst.open(weightStatFile, FileMode.WRITE);
-				fst.writeUTFBytes(defWeightStatXml.toXMLString());
-				fst.close();
-			}
+			// Weight statistics file
+			checkWeightStatFile();
 			
 			// Resolve Undo dir
 			undoDir = File.applicationStorageDirectory.resolvePath(undoDirName);
@@ -1609,6 +1598,9 @@ package
 			 * ================================================================================
 			 */
 			
+			// Check file presence
+			checkWeightStatFile(); 
+			 
 			// Local stats
 			var weightStatProducts:uint = 0;
 			var skippedWeightStatProducts:uint = 0;
@@ -2066,6 +2058,22 @@ package
 			}
 			
 			return srvs;
+		}
+		
+		private function checkWeightStatFile():void 
+		{
+			weightStatFile = File.applicationStorageDirectory.resolvePath("weight-stat.xml");
+			if (!weightStatFile.exists || weightStatFile.size == 0) 
+			{
+				XML.prettyPrinting = true;
+				XML.prettyIndent = 4;
+				var defWeightStatXml:XML = <weight-stat/>;
+				
+				fst = new FileStream();
+				fst.open(weightStatFile, FileMode.WRITE);
+				fst.writeUTFBytes(defWeightStatXml.toXMLString());
+				fst.close();
+			}
 		}
 		
 		private function printDate(noTime:Boolean = false, customDate:Date = null):String
