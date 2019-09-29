@@ -52,10 +52,14 @@ package
 		private var btnCantonMode2:ModeButton;
 		private var btnShenzhen:ModeButton;
 		
+		// Semantic colors (HTML)
 		private const COLOR_BAD:String = "#CC171C"; // Red
 		private const COLOR_SUCCESS:String = "#189510"; // Green
 		private const COLOR_WARN:String = "#CB5815"; // Orange
 		private const COLOR_SPECIAL:String = "#0075BF"; // Blue
+		
+		// Colors for text on light background (HTML)
+		public static const COLOR_TXLB_LIGHT_GREY:String = "#8B9398";
 		
 		private const PRCMODE_FRONTWINNER:int = 1;
 		private const PRCMODE_CANTON_WH_1:int = 2; // Not in use
@@ -440,12 +444,16 @@ package
 			return true;
 		}
 		
-		private function outputLogLine(tx:String, color:String = null):void
+		private function outputLogLine(tx:String, color:String = null, multiColorLine:Boolean = false):void
 		{
 			if (tx == "=")
 				tx = "=============================";
 			
-			ui.taOutput.htmlText += (color != null ? colorText(color, tx) : tx) + "\n";
+			if (multiColorLine)	
+				ui.taOutput.htmlText += tx + "\n";
+			else
+				ui.taOutput.htmlText += (color != null ? colorText(color, tx) : tx) + "\n";
+				
 			ui.taOutput.verticalScrollPosition = ui.taOutput.maxVerticalScrollPosition;
 		}
 		
@@ -1224,10 +1232,32 @@ package
 			 * Show Stats
 			 * ================================================================================
 			 */
-			outputLogLine("Обработано треков: " + tracksCount + ", всего найдено блоков: " + totalRecordsCount);
-			if (invalidTrackRecordsCount > 0) outputLogLine("Количество неверных блоков: " + invalidTrackRecordsCount, COLOR_BAD);
-			if (notTrackRecordsCount > 0) outputLogLine("Пропущенные блоки: " + notTrackRecordsCount, COLOR_WARN);
-			if (existingTracksCount > 0) outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
+			
+			outputLogLine(
+				"Обработано треков: " + tracksCount + 
+				colorText(COLOR_TXLB_LIGHT_GREY, " · ") + 
+				"Всего блоков: " + totalRecordsCount +
+				(notTrackRecordsCount > 0 ? 
+					colorText(COLOR_TXLB_LIGHT_GREY, " · ") + 
+					colorText(COLOR_WARN, "Пропущенные блоки: " + notTrackRecordsCount) : "") +
+				(invalidTrackRecordsCount > 0 ? 
+					colorText(COLOR_TXLB_LIGHT_GREY, " · ") + 
+					colorText(COLOR_BAD, "Ошибка в блоках: " + invalidTrackRecordsCount) : ""),
+				
+				null,
+				true
+			);
+			
+			outputLogLine(
+				colorText(COLOR_SPECIAL, "Новые треки: " + (tracksCount - existingTracksCount).toString()) +
+					
+				(existingTracksCount > 0 ? 
+					colorText(COLOR_TXLB_LIGHT_GREY, " · ") + colorText(COLOR_WARN, "Дубли: " + existingTracksCount) : 
+						colorText(COLOR_TXLB_LIGHT_GREY, " · ") + colorText(COLOR_TXLB_LIGHT_GREY, "Дублей не найдено")),
+				
+					null,
+					true
+			); 
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
@@ -1588,7 +1618,7 @@ package
 			
 			if (tracksCount == existingTracksCount && tracksCount > 0)
 			{
-				outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
+				outputLogLine("Дубли треков: " + existingTracksCount, COLOR_WARN);
 				outputLogLine("Одинаковый прогон — 100% дублей треков", COLOR_BAD);
 				return;
 			}
@@ -1683,13 +1713,53 @@ package
 			 * Show Stats
 			 * ================================================================================
 			 */
-			outputLogLine("Обработано посылок: " + tracksCount);
-			if (existingTracksCount > 0) 
-				outputLogLine("Найденные дубли треков: " + existingTracksCount, COLOR_WARN);
-			if (weightStatProducts > 0) 
-				outputLogLine("Учтённые посылки с одним товаром для сбора статистики веса: " + weightStatProducts);
-			if (skippedWeightStatProducts > 0) 
-				outputLogLine("Неучтённые статистикой веса посылки: " + skippedWeightStatProducts, COLOR_WARN);
+			outputLogLine("Всего обработано посылок из экселя: " + tracksCount);
+			
+			outputLogLine(
+				colorText(COLOR_SPECIAL, "Новые треки: " + (tracksCount - existingTracksCount).toString() /*+
+					" из " + tracksCount*/) +
+					/*colorText(COLOR_TXLB_LIGHT_GREY, 
+						" (" + Math.round(
+								Number(((tracksCount - existingTracksCount) / tracksCount) * 100)
+							).toString() + "%)") +*/
+					
+				(existingTracksCount > 0 ? 
+					colorText(COLOR_TXLB_LIGHT_GREY, " · ") + colorText(COLOR_WARN, "Дубли: " + existingTracksCount) : 
+						colorText(COLOR_TXLB_LIGHT_GREY, " · ") + colorText(COLOR_TXLB_LIGHT_GREY, "Дублей не найдено")),
+				
+					null,
+					true
+			);
+				
+			if (weightStatProducts > 0 || skippedWeightStatProducts > 0)
+			{
+				if (weightStatProducts == 0 && skippedWeightStatProducts > 0)
+				
+					outputLogLine(
+						colorText(COLOR_WARN, "Вес не добавлен в статистику: " + skippedWeightStatProducts) /*+
+							colorText(COLOR_TXLB_LIGHT_GREY, " (100%)")*/, 
+							
+						null,
+						true
+					);
+					
+				else if (weightStatProducts > 0)
+				
+					outputLogLine(
+						colorText(COLOR_SPECIAL, "Вес добавлен в статистику: " + weightStatProducts /*+ 
+							" из " + (weightStatProducts + skippedWeightStatProducts).toString()*/) +
+							/*colorText(COLOR_TXLB_LIGHT_GREY, 
+								" (" + Math.round(
+										Number((weightStatProducts / (weightStatProducts + skippedWeightStatProducts)) * 100)
+									).toString() + "%)") +*/
+									
+						(skippedWeightStatProducts > 0 ? colorText(COLOR_TXLB_LIGHT_GREY, " · ") + 
+							colorText(COLOR_WARN, "Не добавлен: " + skippedWeightStatProducts) : ""),
+							
+						null,
+						true
+					);
+			}
 			
 			if (Capabilities.isDebugger || devFlag)
 			{
