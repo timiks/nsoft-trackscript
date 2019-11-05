@@ -1351,6 +1351,7 @@ package
 			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
 			const packageOrderNumColHeaderPattern:RegExp = /^Order num/i;
 			const totalCostColHeaderPattern:RegExp = /^Total amount/i;
+			const quantityColHeaderPattern:RegExp = /^Quantity/i;
 			
 			var trackCol:String;
 			var nameCol:String;
@@ -1360,6 +1361,7 @@ package
 			var weightCol:String;
 			var packageOrderNumCol:String;
 			var totalCostCol:String;
+			var quantityCol:String;
 			
 			if (xlSheet.cols > xlColLetters.length) 
 			{
@@ -1421,6 +1423,12 @@ package
 					totalCostCol = xlColLetters[i];
 				}
 				
+				// Quantity col header
+				if (quantityCol == null && headerCellVal.search(quantityColHeaderPattern) != -1) 
+				{
+					quantityCol = xlColLetters[i];
+				}
+				
 				// Final check
 				if (trackCol != null && 
 					nameCol != null &&
@@ -1429,7 +1437,8 @@ package
 					skuCol != null &&
 					weightCol != null &&
 					packageOrderNumCol != null &&
-					totalCostCol != null) 
+					totalCostCol != null &&
+					quantityCol != null) 
 				{
 					// All columns determined
 					break;
@@ -1450,7 +1459,8 @@ package
 				", SKU: " + skuCol +
 				", Вес посылки: " + weightCol +
 				", Номер заказа: " + packageOrderNumCol +
-				", Стоимость: " + totalCostCol
+				", Стоимость: " + totalCostCol +
+				", Количество товара: " + quantityCol
 			);
 			*/
 			
@@ -1471,6 +1481,7 @@ package
 			var weightColVal:String;
 			var packageOrderNumColVal:String;
 			var totalCostColVal:String;
+			var quantityColVal:String;
 			
 			function initPackage():void
 			{
@@ -1505,6 +1516,12 @@ package
 					currentPackage.totalCost = totalCostColVal;
 				else
 					outputLogLine("Пустая стоимость на строке " + row, COLOR_WARN);
+					
+				// Quantity
+				if (quantityColVal != null)
+					currentPackage.singleItemQuantity = uint(quantityColVal);
+				else
+					outputLogLine("Пустое количество товара на строке " + row, COLOR_WARN);
 			}
 			
 			function finishPackage():void 
@@ -1530,6 +1547,7 @@ package
 				weightColVal = trimSpaces(xlSheet.getCellValue(weightCol + row));
 				packageOrderNumColVal = trimSpaces(xlSheet.getCellValue(packageOrderNumCol + row));
 				totalCostColVal = trimSpaces(xlSheet.getCellValue(totalCostCol + row));
+				quantityColVal = trimSpaces(xlSheet.getCellValue(quantityCol + row));
 				
 				// Determine line type
 				// · Header line
@@ -1680,6 +1698,9 @@ package
 				{
 					if (pkg.itemsList.length == 1 && pkg.weight != null && pkg.weight != "") 
 					{
+						if (pkg.singleItemQuantity > 1)
+							pkg.weight = (Number(pkg.weight) / pkg.singleItemQuantity).toString();
+						
 						xmlQuery = weightStatXml.p.(@sku == pkg.itemsList[0]);
 						if (xmlQuery.length() > 0) 
 						{
