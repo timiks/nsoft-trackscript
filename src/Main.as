@@ -15,7 +15,7 @@ package
 		
 		// Version
 		private const $version:int 				= 9;
-		private const $versionService:int 		= 6;
+		private const $versionService:int 		= 7;
 		private const $betaVersion:Boolean 		= false;
 		private const $betaVersionNumber:int 	= 0;
 		private const bugs:Boolean 				= false;
