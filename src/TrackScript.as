@@ -1916,14 +1916,33 @@ package
 			// ============
 			// ~ SERVICES ~
 			// ============
-				
+			
+			var servAlias:String;	
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
 			
-			var servAliases:Array = ["gtt"]; // Prev: 'china_ems'
-			var servAlias:String;
+			// Regular standart services
+			var standartServAliases:Array = ["gtt"]; // Prev: 'china_ems'
 			
-			for each (servAlias in servAliases)
+			// #SPECIAL: Special standart services
+			if (track.search(/HK$/i) != -1) 
+			{
+				standartServAliases = ["hkpost"];
+			}
+			else if (track.search(/EE$/i) != -1)
+			{
+				standartServAliases = ["ee_post11"];
+			}
+			else if (track.search(/CH$/i) != -1)
+			{
+				standartServAliases = ["swi"];
+			}
+			else if (track.search(/NL$/i) != -1)
+			{
+				standartServAliases = ["nl_post2"];
+			}
+			
+			for each (servAlias in standartServAliases)
 			{
 				xmlServ = <serv/>;
 				xmlServ.@id = ++maxID;
@@ -1933,6 +1952,7 @@ package
 				xmlTrackServs.appendChild(xmlServ);
 			}
 			
+			// Special services based on country
 			var specialServs:Array;
 			
 			// #SPECIAL-CASE: UK service in Shenzhen mode
