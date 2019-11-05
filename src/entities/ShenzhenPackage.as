@@ -10,6 +10,7 @@ package entities
 		private var $track:String;
 		private var $buyerName:String;
 		private var $buyerCountry:String;
+		private var $buyerPostCode:String;
 		private var $weight:String;
 		private var $packageOrderNum:String;
 		private var $totalCost:String;
@@ -48,6 +49,16 @@ package entities
 		public function set buyerCountry(value:String):void 
 		{
 			$buyerCountry = value;
+		}
+		
+		public function get buyerPostCode():String 
+		{
+			return $buyerPostCode;
+		}
+		
+		public function set buyerPostCode(value:String):void 
+		{
+			$buyerPostCode = value;
 		}
 		
 		public function get weight():String 

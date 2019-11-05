@@ -1346,6 +1346,7 @@ package
 			const trackColHeaderPattern:RegExp = /^Tracking no/i;
 			const nameColHeaderPattern:RegExp = /^Buyer Fullname/i;
 			const countryColHeaderPattern:RegExp = /^Buyer Country/i;
+			const postCodeColHeaderPattern:RegExp = /^Buyer Zip/i;
 			const skuColHeaderPattern:RegExp = /^(SKU|Custom Label)/i;
 			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
 			const packageOrderNumColHeaderPattern:RegExp = /^Order num/i;
@@ -1354,6 +1355,7 @@ package
 			var trackCol:String;
 			var nameCol:String;
 			var countryCol:String;
+			var postCodeCol:String;
 			var skuCol:String;
 			var weightCol:String;
 			var packageOrderNumCol:String;
@@ -1389,6 +1391,12 @@ package
 					countryCol = xlColLetters[i];
 				}
 				
+				// Postcode col header
+				if (postCodeCol == null && headerCellVal.search(postCodeColHeaderPattern) != -1) 
+				{
+					postCodeCol = xlColLetters[i];
+				}
+				
 				// SKU col header
 				if (skuCol == null && headerCellVal.search(skuColHeaderPattern) != -1) 
 				{
@@ -1417,6 +1425,7 @@ package
 				if (trackCol != null && 
 					nameCol != null &&
 					countryCol != null &&
+					postCodeCol != null &&
 					skuCol != null &&
 					weightCol != null &&
 					packageOrderNumCol != null &&
@@ -1432,15 +1441,18 @@ package
 				}
 			}
 			
+			/*
 			outputLogLine(
 				"Колонка с треками: " + trackCol +
 				", Имя покупателя: " + nameCol +
 				", Страна: " + countryCol +
+				", Индекс: " + postCodeCol +
 				", SKU: " + skuCol +
 				", Вес посылки: " + weightCol +
 				", Номер заказа: " + packageOrderNumCol +
 				", Стоимость: " + totalCostCol
 			);
+			*/
 			
 			/**
 			 * Parse table
@@ -1454,6 +1466,7 @@ package
 			var trackColVal:String;
 			var nameColVal:String;
 			var countryColVal:String;
+			var postCodeColVal:String;
 			var skuColVal:String;
 			var weightColVal:String;
 			var packageOrderNumColVal:String;
@@ -1466,6 +1479,7 @@ package
 				currentPackage.track = trackColVal;
 				currentPackage.buyerName = nameColVal;
 				currentPackage.buyerCountry = countryColVal;
+				currentPackage.buyerPostCode = postCodeColVal;
 				currentPackage.itemsList = new Vector.<String>();
 				
 				// SKU
@@ -1511,6 +1525,7 @@ package
 				trackColVal = trimSpaces(xlSheet.getCellValue(trackCol + row));
 				nameColVal = trimSpaces(xlSheet.getCellValue(nameCol + row));
 				countryColVal = trimSpaces(xlSheet.getCellValue(countryCol + row));
+				postCodeColVal = trimSpaces(xlSheet.getCellValue(postCodeCol + row));
 				skuColVal = trimSpaces(xlSheet.getCellValue(skuCol + row));
 				weightColVal = trimSpaces(xlSheet.getCellValue(weightCol + row));
 				packageOrderNumColVal = trimSpaces(xlSheet.getCellValue(packageOrderNumCol + row));
@@ -1601,7 +1616,8 @@ package
 				
 				seoFolder.appendChild(
 					createXmlTrack(pkg.buyerName, pkg.track, pkg.buyerCountry, 
-						userDefinedDateStr, commentWithSkuList, pkg.packageOrderNum, pkg.weight, pkg.totalCost)
+						userDefinedDateStr, commentWithSkuList, pkg.packageOrderNum, 
+						pkg.weight, pkg.totalCost, pkg.buyerPostCode)
 				);
 			}
 			
@@ -1854,11 +1870,19 @@ package
 		private function createXmlTrack(
 			name:String, track:String, country:String,
 			eventSpecialDate:String = null, comment:String = null, orderNum:String = null, 
-			weight:String = null, totalCost:String = null):XML
+			weight:String = null, totalCost:String = null, postCode:String = null):XML
 		{
 			var xmlTrack:XML = <track/>;
 			var xmlTrackServs:XML = <servs/>;
 			var xmlServ:XML;
+			
+			// #SPECIAL: Netherlands
+			if (prcMode == PRCMODE_SHENZHEN && 
+				country.search(/Netherlands/i) != -1 &&
+				track.search(/CN$/i) != -1)
+			{
+				track = track + "/NL/" + clearSpaces(postCode);
+			}
 			
 			xmlTrack.@id = ++maxID; 
 			xmlTrack.@desc = name;
@@ -2169,6 +2193,11 @@ package
 		{
 			var ret:String = str.replace(/^\s*(.*?)\s*$/, "$1");
 			return ret;
+		}
+		
+		private function clearSpaces(str:String):String
+		{
+			return str.replace(/\s+/, "");
 		}
 		
 		private function getFormattedDate(formatStr:String):String 
