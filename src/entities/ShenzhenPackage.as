@@ -10,9 +10,11 @@ package entities
 		private var $track:String;
 		private var $buyerName:String;
 		private var $buyerCountry:String;
+		private var $buyerPostCode:String;
 		private var $weight:String;
 		private var $packageOrderNum:String;
 		private var $totalCost:String;
+		private var $singleItemQuantity:uint;
 		private var $itemsList:Vector.<String>;
 		
 		public function ShenzhenPackage():void 
@@ -50,6 +52,16 @@ package entities
 			$buyerCountry = value;
 		}
 		
+		public function get buyerPostCode():String 
+		{
+			return $buyerPostCode;
+		}
+		
+		public function set buyerPostCode(value:String):void 
+		{
+			$buyerPostCode = value;
+		}
+		
 		public function get weight():String 
 		{
 			return $weight;
@@ -78,6 +90,16 @@ package entities
 		public function set totalCost(value:String):void 
 		{
 			$totalCost = value;
+		}
+		
+		public function get singleItemQuantity():uint 
+		{
+			return $singleItemQuantity;
+		}
+		
+		public function set singleItemQuantity(value:uint):void 
+		{
+			$singleItemQuantity = value;
 		}
 		
 		public function get itemsList():Vector.<String> 

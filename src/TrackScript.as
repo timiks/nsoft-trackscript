@@ -1346,18 +1346,22 @@ package
 			const trackColHeaderPattern:RegExp = /^Tracking no/i;
 			const nameColHeaderPattern:RegExp = /^Buyer Fullname/i;
 			const countryColHeaderPattern:RegExp = /^Buyer Country/i;
+			const postCodeColHeaderPattern:RegExp = /^Buyer Zip/i;
 			const skuColHeaderPattern:RegExp = /^(SKU|Custom Label)/i;
 			const weightColHeaderPattern:RegExp = /^Chargeable weight/i;
 			const packageOrderNumColHeaderPattern:RegExp = /^Order num/i;
 			const totalCostColHeaderPattern:RegExp = /^Total amount/i;
+			const quantityColHeaderPattern:RegExp = /^Quantity/i;
 			
 			var trackCol:String;
 			var nameCol:String;
 			var countryCol:String;
+			var postCodeCol:String;
 			var skuCol:String;
 			var weightCol:String;
 			var packageOrderNumCol:String;
 			var totalCostCol:String;
+			var quantityCol:String;
 			
 			if (xlSheet.cols > xlColLetters.length) 
 			{
@@ -1389,6 +1393,12 @@ package
 					countryCol = xlColLetters[i];
 				}
 				
+				// Postcode col header
+				if (postCodeCol == null && headerCellVal.search(postCodeColHeaderPattern) != -1) 
+				{
+					postCodeCol = xlColLetters[i];
+				}
+				
 				// SKU col header
 				if (skuCol == null && headerCellVal.search(skuColHeaderPattern) != -1) 
 				{
@@ -1413,14 +1423,22 @@ package
 					totalCostCol = xlColLetters[i];
 				}
 				
+				// Quantity col header
+				if (quantityCol == null && headerCellVal.search(quantityColHeaderPattern) != -1) 
+				{
+					quantityCol = xlColLetters[i];
+				}
+				
 				// Final check
 				if (trackCol != null && 
 					nameCol != null &&
 					countryCol != null &&
+					postCodeCol != null &&
 					skuCol != null &&
 					weightCol != null &&
 					packageOrderNumCol != null &&
-					totalCostCol != null) 
+					totalCostCol != null &&
+					quantityCol != null) 
 				{
 					// All columns determined
 					break;
@@ -1432,15 +1450,19 @@ package
 				}
 			}
 			
+			/*
 			outputLogLine(
 				"Колонка с треками: " + trackCol +
 				", Имя покупателя: " + nameCol +
 				", Страна: " + countryCol +
+				", Индекс: " + postCodeCol +
 				", SKU: " + skuCol +
 				", Вес посылки: " + weightCol +
 				", Номер заказа: " + packageOrderNumCol +
-				", Стоимость: " + totalCostCol
+				", Стоимость: " + totalCostCol +
+				", Количество товара: " + quantityCol
 			);
+			*/
 			
 			/**
 			 * Parse table
@@ -1454,10 +1476,12 @@ package
 			var trackColVal:String;
 			var nameColVal:String;
 			var countryColVal:String;
+			var postCodeColVal:String;
 			var skuColVal:String;
 			var weightColVal:String;
 			var packageOrderNumColVal:String;
 			var totalCostColVal:String;
+			var quantityColVal:String;
 			
 			function initPackage():void
 			{
@@ -1466,6 +1490,7 @@ package
 				currentPackage.track = trackColVal;
 				currentPackage.buyerName = nameColVal;
 				currentPackage.buyerCountry = countryColVal;
+				currentPackage.buyerPostCode = postCodeColVal;
 				currentPackage.itemsList = new Vector.<String>();
 				
 				// SKU
@@ -1491,6 +1516,12 @@ package
 					currentPackage.totalCost = totalCostColVal;
 				else
 					outputLogLine("Пустая стоимость на строке " + row, COLOR_WARN);
+					
+				// Quantity
+				if (quantityColVal != null)
+					currentPackage.singleItemQuantity = uint(quantityColVal);
+				else
+					outputLogLine("Пустое количество товара на строке " + row, COLOR_WARN);
 			}
 			
 			function finishPackage():void 
@@ -1511,10 +1542,12 @@ package
 				trackColVal = trimSpaces(xlSheet.getCellValue(trackCol + row));
 				nameColVal = trimSpaces(xlSheet.getCellValue(nameCol + row));
 				countryColVal = trimSpaces(xlSheet.getCellValue(countryCol + row));
+				postCodeColVal = trimSpaces(xlSheet.getCellValue(postCodeCol + row));
 				skuColVal = trimSpaces(xlSheet.getCellValue(skuCol + row));
 				weightColVal = trimSpaces(xlSheet.getCellValue(weightCol + row));
 				packageOrderNumColVal = trimSpaces(xlSheet.getCellValue(packageOrderNumCol + row));
 				totalCostColVal = trimSpaces(xlSheet.getCellValue(totalCostCol + row));
+				quantityColVal = trimSpaces(xlSheet.getCellValue(quantityCol + row));
 				
 				// Determine line type
 				// · Header line
@@ -1601,7 +1634,8 @@ package
 				
 				seoFolder.appendChild(
 					createXmlTrack(pkg.buyerName, pkg.track, pkg.buyerCountry, 
-						userDefinedDateStr, commentWithSkuList, pkg.packageOrderNum, pkg.weight, pkg.totalCost)
+						userDefinedDateStr, commentWithSkuList, pkg.packageOrderNum, 
+						pkg.weight, pkg.totalCost, pkg.buyerPostCode)
 				);
 			}
 			
@@ -1664,6 +1698,9 @@ package
 				{
 					if (pkg.itemsList.length == 1 && pkg.weight != null && pkg.weight != "") 
 					{
+						if (pkg.singleItemQuantity > 1)
+							pkg.weight = (Number(pkg.weight) / pkg.singleItemQuantity).toString();
+						
 						xmlQuery = weightStatXml.p.(@sku == pkg.itemsList[0]);
 						if (xmlQuery.length() > 0) 
 						{
@@ -1854,11 +1891,19 @@ package
 		private function createXmlTrack(
 			name:String, track:String, country:String,
 			eventSpecialDate:String = null, comment:String = null, orderNum:String = null, 
-			weight:String = null, totalCost:String = null):XML
+			weight:String = null, totalCost:String = null, postCode:String = null):XML
 		{
 			var xmlTrack:XML = <track/>;
 			var xmlTrackServs:XML = <servs/>;
 			var xmlServ:XML;
+			
+			// #SPECIAL: Netherlands
+			if (prcMode == PRCMODE_SHENZHEN && 
+				country.search(/Netherlands/i) != -1 &&
+				track.search(/CN$/i) != -1)
+			{
+				track = track + "/NL/" + clearSpaces(postCode);
+			}
 			
 			xmlTrack.@id = ++maxID; 
 			xmlTrack.@desc = name;
@@ -1871,14 +1916,33 @@ package
 			// ============
 			// ~ SERVICES ~
 			// ============
-				
+			
+			var servAlias:String;	
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
 			
-			var servAliases:Array = ["gtt"]; // Prev: 'china_ems'
-			var servAlias:String;
+			// Regular standart services
+			var standartServAliases:Array = ["gtt"]; // Prev: 'china_ems'
 			
-			for each (servAlias in servAliases)
+			// #SPECIAL: Special standart services
+			if (track.search(/HK$/i) != -1) 
+			{
+				standartServAliases = ["hkpost"];
+			}
+			else if (track.search(/EE$/i) != -1)
+			{
+				standartServAliases = ["ee_post11"];
+			}
+			else if (track.search(/CH$/i) != -1)
+			{
+				standartServAliases = ["swi"];
+			}
+			else if (track.search(/NL$/i) != -1)
+			{
+				standartServAliases = ["nl_post2"];
+			}
+			
+			for each (servAlias in standartServAliases)
 			{
 				xmlServ = <serv/>;
 				xmlServ.@id = ++maxID;
@@ -1888,6 +1952,7 @@ package
 				xmlTrackServs.appendChild(xmlServ);
 			}
 			
+			// Special services based on country
 			var specialServs:Array;
 			
 			// #SPECIAL-CASE: UK service in Shenzhen mode
@@ -2169,6 +2234,11 @@ package
 		{
 			var ret:String = str.replace(/^\s*(.*?)\s*$/, "$1");
 			return ret;
+		}
+		
+		private function clearSpaces(str:String):String
+		{
+			return str.replace(/\s+/, "");
 		}
 		
 		private function getFormattedDate(formatStr:String):String 
