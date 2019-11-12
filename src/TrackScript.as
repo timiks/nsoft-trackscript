@@ -1893,23 +1893,35 @@ package
 			eventSpecialDate:String = null, comment:String = null, orderNum:String = null, 
 			weight:String = null, totalCost:String = null, postCode:String = null):XML
 		{
-			var xmlTrack:XML = <track/>;
-			var xmlTrackServs:XML = <servs/>;
-			var xmlServ:XML;
+			var trackOutput:String; // For track value modifications
+			
+			trackOutput = track; // Standart track value output
+			
+			// ====================
+			// ~ TRACK VALUE MODS ~
+			// ====================
 			
 			// #SPECIAL: Netherlands
 			if (prcMode == PRCMODE_SHENZHEN && 
 				country.search(/Netherlands/i) != -1 &&
 				track.search(/CN$/i) != -1)
 			{
-				track = track + "/NL/" + clearSpaces(postCode);
+				trackOutput = track + "/NL/" + clearSpaces(postCode); // Mod
 			}
+			
+			// =========================
+			// ~ TRACK ENTRY FORMATION ~
+			// =========================
+			
+			// New track
+			var xmlTrack:XML = <track/>;
 			
 			xmlTrack.@id = ++maxID; 
 			xmlTrack.@desc = name;
 			xmlTrack.@crdt = currentDate;
-			xmlTrack.@track = track;
+			xmlTrack.@track = trackOutput;
 			
+			// Comment
 			if (comment != null)
 				xmlTrack.@comm = comment;
 			
@@ -1917,7 +1929,10 @@ package
 			// ~ SERVICES ~
 			// ============
 			
-			var servAlias:String;	
+			var xmlTrackServs:XML = <servs/>;
+			var xmlServ:XML;
+			var servAlias:String;
+			
 			xmlTrackServs.@id = ++maxID;
 			xmlTrackServs.@crdt = currentDate;
 			
@@ -1940,6 +1955,10 @@ package
 			else if (track.search(/NL$/i) != -1)
 			{
 				standartServAliases = ["nl_post2"];
+			}
+			else if (track.search(/DE$/i) != -1)
+			{
+				standartServAliases = ["dhl_ec_asia"];
 			}
 			
 			for each (servAlias in standartServAliases)
