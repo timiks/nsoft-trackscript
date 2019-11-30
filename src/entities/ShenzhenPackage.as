@@ -1,5 +1,6 @@
 package entities 
 {
+	import flash.utils.Dictionary;
 		
 	/**
 	 * ...
@@ -16,6 +17,7 @@ package entities
 		private var $totalCost:String;
 		private var $singleItemQuantity:uint;
 		private var $itemsList:Vector.<String>;
+		private var $itemsQuantityList:Dictionary;
 		
 		public function ShenzhenPackage():void 
 		{
@@ -110,6 +112,16 @@ package entities
 		public function set itemsList(value:Vector.<String>):void 
 		{
 			$itemsList = value;
+		}
+		
+		public function get itemsQuantityList():Dictionary 
+		{
+			return $itemsQuantityList;
+		}
+		
+		public function set itemsQuantityList(value:Dictionary):void 
+		{
+			$itemsQuantityList = value;
 		}
 	}
 }
