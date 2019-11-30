@@ -30,6 +30,7 @@ package
 	import flash.text.TextFormat;
 	import flash.ui.Keyboard;
 	import flash.utils.ByteArray;
+	import flash.utils.Dictionary;
 	
 	/**
 	 * ...
@@ -503,6 +504,12 @@ package
 			{
 				outputLogLine("Ошибка в пути к файлу с данными TrackChecker. Запуск невозможен.", COLOR_BAD);
 				return;
+			}
+			
+			if (!xmlFile.exists) 
+			{
+				outputLogLine("Файл с данными TrackChecker не найден", COLOR_BAD);
+				return
 			}
 			
 			ui.taOutput.text = "";
@@ -1492,6 +1499,7 @@ package
 				currentPackage.buyerCountry = countryColVal;
 				currentPackage.buyerPostCode = postCodeColVal;
 				currentPackage.itemsList = new Vector.<String>();
+				currentPackage.itemsQuantityList = new Dictionary();
 				
 				// SKU
 				if (skuColVal != null)
@@ -1518,10 +1526,17 @@ package
 					outputLogLine("Пустая стоимость на строке " + row, COLOR_WARN);
 					
 				// Quantity
-				if (quantityColVal != null)
+				if (quantityColVal != null && skuColVal != null)
+				{
 					currentPackage.singleItemQuantity = uint(quantityColVal);
+					
+					if (skuColVal != null)
+						currentPackage.itemsQuantityList[skuColVal] = uint(quantityColVal);
+				}
 				else
-					outputLogLine("Пустое количество товара на строке " + row, COLOR_WARN);
+				{
+					outputLogLine("Проблема с количеством товара на строке " + row, COLOR_WARN);
+				}
 			}
 			
 			function finishPackage():void 
@@ -1566,6 +1581,7 @@ package
 					if (currentPackage != null)
 					{
 						currentPackage.itemsList.push(skuColVal);
+						currentPackage.itemsQuantityList[skuColVal] = uint(quantityColVal);
 						continue;
 					}
 					else 
@@ -1630,7 +1646,22 @@ package
 					continue;
 				}
 				
-				commentWithSkuList = pkg.itemsList.length > 0 ? pkg.itemsList.join("\n") : null;
+				// SKU list in tracks' comment
+				if (pkg.itemsList.length > 0) 
+				{
+					commentWithSkuList = "";
+					
+					for each (var skuEntry:String in pkg.itemsList) 
+					{
+						if (uint(pkg.itemsQuantityList[skuEntry]) > 1) 
+							commentWithSkuList += skuEntry + " (x" + String(pkg.itemsQuantityList[skuEntry]) + ")";
+						else 
+							commentWithSkuList += skuEntry;
+						
+						// New line symbol
+						commentWithSkuList += skuEntry != pkg.itemsList[pkg.itemsList.length-1] ? "\n" : "";
+					}
+				}
 				
 				seoFolder.appendChild(
 					createXmlTrack(pkg.buyerName, pkg.track, pkg.buyerCountry, 
