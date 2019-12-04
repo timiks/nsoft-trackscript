@@ -67,6 +67,8 @@ package
 		private const PRCMODE_CANTON_WH_2:int = 3;
 		private const PRCMODE_SHENZHEN:int = 4;
 		
+		private const postCodeTemplateForNetherlands:RegExp = /^([A-Za-z\d]{1,4}|\d{4,8})[-| ]*([A-Za-z\d]{1,4}|\d{4,8})/;
+		
 		private var prcMode:int;
 		private var currentPrcModeButton:ModeButton;
 		private var xlFilePathError:Boolean = false;
@@ -1164,6 +1166,18 @@ package
 				currentTrackRecord.track = trimSpaces(tmpRecordSourceLines[1]);
 				currentTrackRecord.name = trimSpaces(tmpRecordSourceLines[2]);
 				currentTrackRecord.country = trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-1]); // Last line
+				
+				// #SPECIAL: Netherlands only
+				if (currentTrackRecord.country == "Netherlands") 
+				{
+					// Check the line before last on postal code
+					var rea:Array = 
+						trimSpaces(tmpRecordSourceLines[tmpRecordSourceLines.length-2])
+							.match(postCodeTemplateForNetherlands);
+					
+					currentTrackRecord.postCode = rea[0];
+				}
+				
 				allTrackRecords.push(currentTrackRecord);
 				tracksCount++; // Track is considered handled only if record is valid
 				return 0;
@@ -1192,10 +1206,12 @@ package
 			var rec:Object
 			for each (rec in allTrackRecords) 
 			{
-				newFrontwinnerGrp.appendChild(createXmlTrack(rec.name, rec.track, rec.country, rec.date, null, rec.orderNum));
+				newFrontwinnerGrp.appendChild(
+					createXmlTrack(rec.name, rec.track, rec.country, rec.date, null, rec.orderNum, null, null, 
+						rec.postCode));
 			}
 			
-			var rootGroup:XMLList = dataXml.groups.(@id == 0);
+			var rootGroup:XML = dataXml.groups.(@id == 0)[0];
 			
 			var xmlQuery:XMLList;
 			var frontwinnerGrp:XML;
@@ -1208,10 +1224,8 @@ package
 				{
 					// Track Existence Check
 					// If found duplicate > skip this track
-					xmlQuery = frontwinnerGrp.track.(trimSpaces(@desc) == t.@desc && trimSpaces(@track) == t.@track);
-					if (xmlQuery.length() > 0)
+					if (checkXmlTrackDuplicate(rootGroup, t.@track, t.@desc)) 
 					{
-						main.logRed("Track Duplicate Found: " + t.@desc + " " + t.@track);
 						existingTracksCount++;
 						continue;
 					}
@@ -1638,10 +1652,8 @@ package
 			
 			for each (pkg in packages) 
 			{
-				xmlQuery = dataXml..track.(trimSpaces(@desc) == pkg.buyerName && trimSpaces(@track) == pkg.track);
-				if (xmlQuery.length() > 0) 
+				if (checkXmlTrackDuplicate(dataXml, pkg.track, pkg.buyerName)) 
 				{
-					main.logRed("Track Duplicate Found: " + pkg.buyerName + " " + pkg.track);
 					existingTracksCount++;
 					continue;
 				}
@@ -1933,11 +1945,13 @@ package
 			// ====================
 			
 			// #SPECIAL: Netherlands
-			if (prcMode == PRCMODE_SHENZHEN && 
-				country.search(/Netherlands/i) != -1 &&
+			if (country.search(/Netherlands/i) != -1 &&
 				track.search(/CN$/i) != -1)
 			{
-				trackOutput = track + "/NL/" + clearSpaces(postCode); // Mod
+				if (postCode == null)
+					outputLogLine("Проблема с индексом в треке для NL " + track + " (" + name + ")");
+				else
+					trackOutput = track + "/NL/" + clearSpaces(postCode); // Mod
 			}
 			
 			// =========================
@@ -2093,6 +2107,17 @@ package
 			g.@desc = grpName;
 			g.@crdt = currentDate;
 			return g;
+		}
+		
+		private function checkXmlTrackDuplicate(xmlGroupToExplore:XML, trackVal:String, trackDesc:String):Boolean 
+		{
+			var xmlQuery:XMLList = 
+				xmlGroupToExplore..track.(trimSpaces(@desc).search(trackDesc) != -1 && trimSpaces(@track).search(trackVal) != -1);
+				
+			if (xmlQuery.length() > 0) 
+				return true;
+			
+			return false;
 		}
 		
 		private function searchExcelColumnByHeader(xlSheet:Worksheet, headerPattern:RegExp, headerRow:int, maxColumn:String):String 
