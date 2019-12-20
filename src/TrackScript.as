@@ -2112,7 +2112,7 @@ package
 		private function checkXmlTrackDuplicate(xmlGroupToExplore:XML, trackVal:String, trackDesc:String):Boolean 
 		{
 			var xmlQuery:XMLList = 
-				xmlGroupToExplore..track.(trimSpaces(@desc).search(trackDesc) != -1 && trimSpaces(@track).search(trackVal) != -1);
+				xmlGroupToExplore..track.(trimSpaces(@desc).indexOf(trackDesc) != -1 && trimSpaces(@track).indexOf(trackVal) != -1);
 				
 			if (xmlQuery.length() > 0) 
 				return true;
